@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TerraRun | UI Examples</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #23322c; font-family: Manrope, sans-serif; letter-spacing: 0; background: #f5f7f5; }
+    button, select, input { font: inherit; }
+    button { cursor: pointer; }
+    .examples { height: 66px; padding: 0 24px; display: flex; align-items: center; gap: 24px; background: #192720; color: white; }
+    .examples strong { font-size: 13px; }
+    .variants { display: flex; gap: 4px; }
+    .variants button { border: 0; color: #bdc9c1; background: transparent; padding: 10px 16px; border-radius: 4px; font-size: 12px; }
+    .variants button[aria-pressed="true"] { background: #e6f4a8; color: #1b3021; }
+    .preview { position: relative; height: calc(100dvh - 66px); min-height: 580px; overflow: hidden; }
+    .header { position: absolute; z-index: 3; inset: 0 0 auto; height: 72px; background: white; border-bottom: 1px solid #dfe5df; display: flex; align-items: center; gap: 32px; padding: 0 28px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; }
+    .brand-mark { width: 30px; height: 30px; display: grid; place-items: center; background: #17684d; color: white; border-radius: 6px; font-size: 20px; }
+    .location { color: #6d7f72; font-size: 12px; }
+    .profile { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12px; }
+    .avatar { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: #e7efdf; color: #376039; font-size: 11px; font-weight: 800; }
+    #map { position: absolute; }
+    .map { inset: 72px 0 0 310px; }
+    .sidebar { position: absolute; z-index: 2; top: 72px; left: 0; bottom: 0; width: 310px; background: white; border-right: 1px solid #dfe5df; padding: 28px 22px; overflow: auto; }
+    .eyebrow { color: #748579; font-size: 10px; text-transform: uppercase; font-weight: 700; }
+    h1 { margin: 5px 0 22px; font-size: 24px; font-weight: 800; }
+    .section-heading { display: flex; align-items: center; justify-content: space-between; }
+    .period { width: 100%; padding: 10px; background: #f6f8f6; border: 1px solid #dfe5df; border-radius: 4px; font-size: 12px; color: #35493d; }
+    .list-heading { display: flex; justify-content: space-between; align-items: center; margin: 24px 0 6px; font-size: 11px; color: #6d7f72; }
+    .clear { padding: 4px 0; border: 0; background: transparent; color: #17684d; font-size: 11px; }
+    .route { display: grid; grid-template-columns: 16px 5px 1fr auto; gap: 9px; align-items: center; padding: 17px 0; border-bottom: 1px solid #e8ede8; cursor: pointer; }
+    .route input { accent-color: #17684d; margin: 0; }
+    .swatch { width: 4px; height: 30px; background: var(--color); border-radius: 2px; }
+    .route strong { display: block; font-size: 12px; font-weight: 700; }
+    .route small { display: block; margin-top: 5px; font-size: 10px; color: #809086; }
+    .distance { text-align: right; font-size: 11px; font-weight: 700; }
+    .import { display: block; width: 100%; margin-top: 26px; padding: 12px; border: 1px solid #17684d; border-radius: 4px; background: #17684d; color: white; font-size: 12px; }
+    .stats { margin-top: 34px; padding-top: 20px; border-top: 1px solid #dfe5df; display: grid; grid-template-columns: 1fr 1fr; gap: 22px 12px; }
+    .stat span { display: block; color: #748579; font-size: 10px; }
+    .stat strong { display: block; margin-top: 6px; font-family: 'Space Grotesk', sans-serif; font-size: 23px; font-weight: 600; }
+    .stat small { font-size: 11px; font-weight: 400; }
+    .shared strong { color: #17684d; }
+    .map-caption { position: absolute; z-index: 1; top: 94px; left: 338px; background: white; border: 1px solid #dfe5df; padding: 12px 16px; font-size: 12px; border-radius: 4px; }
+    .tools { position: absolute; z-index: 2; right: 24px; top: 96px; display: flex; gap: 6px; align-items: center; background: white; border: 1px solid #dfe5df; border-radius: 4px; padding: 5px; }
+    .tools button { width: 32px; height: 32px; border: 0; background: #f2f6f1; font-size: 20px; color: #284b35; border-radius: 3px; }
+    .tools label { font-size: 11px; padding: 0 7px; }
+    .tools input { accent-color: #17684d; vertical-align: middle; }
+    .table { display: none; }
+    .canvas .header { inset: 18px 22px auto; height: 58px; border: 1px solid #dfe5df; border-radius: 6px; padding: 0 18px; }
+    .canvas .map { inset: 0; }
+    .canvas .sidebar { top: auto; bottom: 24px; left: 24px; right: 24px; width: auto; height: 188px; border: 1px solid #dfe5df; border-radius: 6px; padding: 20px 24px; display: grid; grid-template-columns: 170px minmax(0, 1fr) 270px; gap: 24px; overflow: hidden; }
+    .canvas .sidebar h1 { font-size: 20px; margin-bottom: 14px; }
+    .canvas .route-list { display: flex; align-items: center; min-width: 0; gap: 24px; }
+    .canvas .route { flex: 1; min-width: 0; border: 0; grid-template-columns: 16px 5px 1fr; }
+    .canvas .distance { grid-column: 3; text-align: left; }
+    .canvas .list-heading, .canvas .import { display: none; }
+    .canvas .stats { margin: 0; padding: 20px 0 0 24px; border-top: 0; border-left: 1px solid #dfe5df; gap: 15px; }
+    .canvas .tools { top: 96px; }
+    .canvas .map-caption { top: 96px; left: 24px; }
+    .canvas .sidebar { background: #193e32; color: #f0f8f2; border-color: #315547; }
+    .canvas .sidebar .eyebrow, .canvas .sidebar .stat span, .canvas .sidebar .route small { color: #b7cfc0; }
+    .canvas .sidebar .shared strong { color: #d6ef8d; }
+    .canvas .sidebar .stats { border-left-color: #426354; }
+    .canvas .period { background: #284f40; color: #f0f8f2; border-color: #537662; }
+    .analysis .header { height: 62px; }
+    .analysis .map { inset: 62px 250px 228px 0; }
+    .analysis .sidebar { top: 62px; left: auto; right: 0; width: 250px; bottom: 228px; padding: 24px 20px; border-left: 1px solid #dfe5df; }
+    .analysis .sidebar h1 { font-size: 20px; }
+    .analysis .route-list, .analysis .list-heading { display: none; }
+    .analysis .stats { grid-template-columns: 1fr; gap: 16px; margin-top: 24px; padding-top: 24px; }
+    .analysis .stat { display: flex; justify-content: space-between; align-items: center; }
+    .analysis .stat strong { margin: 0; font-size: 23px; }
+    .analysis .tools { top: 82px; right: 270px; }
+    .analysis .map-caption { top: 82px; left: 22px; }
+    .analysis .table { display: block; position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 228px; padding: 18px 28px; background: white; border-top: 1px solid #dfe5df; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+    th { color: #809086; font-size: 10px; font-weight: 500; padding: 0 10px 12px; }
+    td { padding: 13px 10px; border-top: 1px solid #edf1ed; }
+    td input { accent-color: #17684d; }
+    .table-color { display: inline-block; width: 7px; height: 7px; background: var(--color); margin-right: 10px; border-radius: 50%; }
+    @media (max-width: 700px) {
+      .examples { height: 94px; padding: 12px; gap: 8px; flex-direction: column; align-items: stretch; }
+      .examples strong { font-size: 11px; }
+      .variants { width: 100%; }
+      .variants button { flex: 1; font-size: 10px; padding: 9px 5px; }
+      .preview { height: calc(100dvh - 94px); min-height: 610px; }
+      .header, .analysis .header { height: 60px; padding: 0 14px; gap: 10px; }
+      .brand { font-size: 23px; }
+      .location, .profile > span:not(.avatar) { display: none; }
+      .map, .analysis .map { inset: 60px 0 248px; }
+      .sidebar, .analysis .sidebar { top: auto; left: 0; right: 0; bottom: 0; width: auto; height: 248px; padding: 16px; }
+      h1 { font-size: 19px; margin: 3px 0 10px; }
+      .section-heading { display: inline-flex; }
+      .sidebar > div:first-child { display: flex; align-items: center; gap: 20px; }
+      .period { flex: 1; min-width: 0; }
+      .list-heading { margin-top: 8px; }
+      .route { padding: 10px 0; }
+      .stats, .import { display: none; }
+      .map-caption, .analysis .map-caption { top: 76px; left: 12px; font-size: 10px; padding: 8px; }
+      .tools, .analysis .tools { top: 118px; right: 12px; }
+      .canvas .header { inset: 10px 10px auto; padding: 0 12px; }
+      .atlas .sidebar { top: 60px; right: auto; bottom: 0; width: 170px; height: auto; padding: 16px 12px; }
+      .atlas .map { inset: 60px 0 0 170px; }
+      .atlas .sidebar > div:first-child { display: block; }
+      .atlas .period { width: 100%; margin-top: 6px; padding: 8px 4px; font-size: 10px; }
+      .atlas .route { grid-template-columns: 16px 4px minmax(0, 1fr); gap: 6px; padding: 16px 0; }
+      .atlas .route strong { overflow-wrap: anywhere; font-size: 11px; }
+      .atlas .distance { grid-column: 3; text-align: left; }
+      .atlas .list-heading { align-items: flex-start; gap: 6px; font-size: 9px; }
+      .atlas .clear { font-size: 9px; }
+      .atlas .map-caption { left: 180px; }
+      .atlas .tools { flex-wrap: wrap; width: 150px; justify-content: flex-end; }
+      .canvas .sidebar { display: block; height: 192px; left: 10px; right: 10px; bottom: 10px; padding: 14px; }
+      .canvas .sidebar > div:first-child { justify-content: space-between; gap: 12px; }
+      .canvas .sidebar h1 { font-size: 17px; margin-bottom: 4px; }
+      .canvas .period { max-width: 168px; padding: 8px 6px; font-size: 10px; }
+      .canvas .route-list { display: flex; gap: 18px; overflow-x: auto; margin-top: 12px; padding-bottom: 8px; }
+      .canvas .route { display: grid; flex: 0 0 150px; grid-template-columns: 16px 5px minmax(0, 1fr); padding: 8px 0; gap: 6px; }
+      .canvas .route strong { font-size: 11px; white-space: normal; }
+      .canvas .distance { grid-column: 3; text-align: left; }
+      .canvas .stats { display: none; }
+      .canvas .map-caption { top: 82px; left: 12px; }
+      .canvas .tools { top: 122px; }
+      .analysis .sidebar { top: 60px; bottom: auto; height: 144px; padding: 12px; border-bottom: 1px solid #dfe5df; overflow: hidden; }
+      .analysis .sidebar h1 { font-size: 15px; margin: 3px 0; }
+      .analysis .sidebar .eyebrow { font-size: 8px; }
+      .analysis .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; padding-top: 12px; }
+      .analysis .stat { display: block; min-width: 0; }
+      .analysis .stat span { font-size: 9px; }
+      .analysis .stat strong { margin-top: 5px; font-size: 18px; }
+      .analysis .stat small { font-size: 9px; }
+      .analysis .table { height: 220px; padding: 14px 8px; }
+      .analysis .map { inset: 204px 0 220px; }
+      .analysis .map-caption { top: 216px; }
+      .analysis .tools { top: 254px; }
+      th, td { padding-left: 5px; padding-right: 5px; font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="examples" aria-label="UI examples">
+    <strong>TerraRun / UI Examples</strong>
+    <div class="variants">
+      <button data-layout="atlas" aria-pressed="true">01 / Atlas</button>
+      <button data-layout="canvas" aria-pressed="false">02 / Map</button>
+      <button data-layout="analysis" aria-pressed="false">03 / Analytics</button>
+    </div>
+  </nav>
+  <main class="preview atlas" id="preview">
+    <div id="map" class="map"></div>
+    <header class="header"><div class="brand"><span class="brand-mark">↗</span>TerraRun</div><span class="location">New York / Manhattan</span><div class="profile"><span>Mila Chen</span><span class="avatar">MC</span></div></header>
+    <aside class="sidebar">
+      <div><div class="section-heading"><div><span class="eyebrow">Your activity</span><h1>Routes</h1></div></div><select class="period" aria-label="Period"><option>Last month</option><option>Last week</option><option>Last route</option></select></div>
+      <div class="list-heading"><span id="selection-count">3 routes selected</span><button class="clear" id="clear">Clear selection</button></div>
+      <div class="route-list" id="route-list"></div>
+      <label class="import">+ Import route<input type="file" accept=".gpx,.geojson" hidden /></label>
+      <div class="stats"><div class="stat"><span>Distance</span><strong>13.1 <small>km</small></strong></div><div class="stat"><span>Territory</span><strong>0.82 <small>km²</small></strong></div><div class="stat shared"><span>Shared area</span><strong>0.16 <small>km²</small></strong></div><div class="stat"><span>Activities</span><strong>03</strong></div></div>
+    </aside>
+    <div class="map-caption">Manhattan <span style="color:#809086">/ 3 routes</span></div>
+    <div class="tools"><label><input id="areas" type="checkbox" checked /> Territories</label><button id="zoom-in" title="Zoom in">+</button><button id="zoom-out" title="Zoom out">−</button></div>
+    <section class="table" aria-label="Route table"><table><thead><tr><th></th><th>Route</th><th>Date</th><th>Distance</th><th>Area</th></tr></thead><tbody id="table-body"></tbody></table></section>
+  </main>
+  <script type="module">
+    import maplibregl from 'maplibre-gl';
+    import 'maplibre-gl/dist/maplibre-gl.css';
+    const routes = [
+      { name: 'Bryant Park Loop', date: 'Nov 10', distance: '4.8', area: '0.34', color: '#179776', coordinates: [[-73.991,40.751],[-73.984,40.755],[-73.978,40.751],[-73.984,40.747],[-73.991,40.751]] },
+      { name: 'Midtown Circuit', date: 'Nov 9', distance: '5.1', area: '0.31', color: '#e16e5b', coordinates: [[-73.984,40.755],[-73.977,40.759],[-73.972,40.754],[-73.978,40.751],[-73.984,40.755]] },
+      { name: 'Hudson Morning', date: 'Nov 7', distance: '3.2', area: '0.17', color: '#528cd3', coordinates: [[-74.001,40.749],[-73.995,40.753],[-73.988,40.749],[-73.995,40.745],[-74.001,40.749]] },
+    ];
+    const selected = new Set([0,1,2]);
+    const map = new maplibregl.Map({ container: 'map', style: 'https://tiles.openfreemap.org/styles/positron', center: [-73.985,40.7515], zoom: 13.6, pitch: 0, attributionControl: true });
+    const collection = type => ({ type: 'FeatureCollection', features: routes.flatMap((route,index) => selected.has(index) ? [{ type: 'Feature', properties: { color: route.color }, geometry: { type, coordinates: type === 'Polygon' ? [route.coordinates] : route.coordinates } }] : []) });
+    function update() {
+      map.getSource('territories')?.setData(collection('Polygon'));
+      map.getSource('routes')?.setData(collection('LineString'));
+      document.querySelectorAll('[data-route]').forEach(input => { input.checked = selected.has(Number(input.dataset.route)); });
+      document.querySelector('#selection-count').textContent = `${selected.size} ${selected.size === 1 ? 'route' : 'routes'} selected`;
+      document.querySelector('.map-caption span').textContent = `/ ${selected.size} ${selected.size === 1 ? 'route' : 'routes'}`;
+    }
+    routes.forEach((route,index) => {
+      document.querySelector('#route-list').insertAdjacentHTML('beforeend', `<label class="route" style="--color:${route.color}"><input type="checkbox" data-route="${index}" checked /><span class="swatch"></span><span><strong>${route.name}</strong><small>${route.date} 2026</small></span><span class="distance">${route.distance} km<small>${route.area} km²</small></span></label>`);
+      document.querySelector('#table-body').insertAdjacentHTML('beforeend', `<tr style="--color:${route.color}"><td><input type="checkbox" data-route="${index}" checked /></td><td><span class="table-color"></span>${route.name}</td><td>${route.date}</td><td>${route.distance} km</td><td>${route.area} km²</td></tr>`);
+    });
+    document.querySelectorAll('[data-route]').forEach(input => input.addEventListener('change', () => { const index = Number(input.dataset.route); if(input.checked) selected.add(index); else selected.delete(index); update(); }));
+    map.on('load', () => {
+      map.addSource('territories',{ type:'geojson', data:collection('Polygon') });
+      map.addLayer({ id:'territories', type:'fill', source:'territories', paint:{ 'fill-color':['get','color'], 'fill-opacity':0.3 } });
+      map.addSource('routes',{ type:'geojson', data:collection('LineString') });
+      map.addLayer({ id:'routes', type:'line', source:'routes', paint:{ 'line-color':['get','color'], 'line-width':3 } });
+    });
+    function applyLayout() {
+      const requested = location.hash.slice(1);
+      const layout = ['atlas', 'canvas', 'analysis'].includes(requested) ? requested : 'atlas';
+      document.querySelector('#preview').className = `preview ${layout}`;
+      document.querySelectorAll('[data-layout]').forEach(option => option.setAttribute('aria-pressed', String(option.dataset.layout === layout)));
+      requestAnimationFrame(() => { map.resize(); map.fitBounds([[-74.005,40.742],[-73.968,40.762]],{ padding:40, duration:0 }); });
+    }
+    document.querySelectorAll('[data-layout]').forEach(button => button.addEventListener('click', () => {
+      location.hash = button.dataset.layout;
+      applyLayout();
+    }));
+    addEventListener('hashchange', applyLayout);
+    applyLayout();
+    document.querySelector('#clear').addEventListener('click', () => { if(selected.size) selected.clear(); else routes.forEach((_,index) => selected.add(index)); update(); });
+    document.querySelector('#areas').addEventListener('change', event => { if(map.getLayer('territories')) map.setLayoutProperty('territories','visibility',event.target.checked ? 'visible' : 'none'); });
+    document.querySelector('#zoom-in').addEventListener('click', () => map.zoomIn());
+    document.querySelector('#zoom-out').addEventListener('click', () => map.zoomOut());
+    new ResizeObserver(() => map.resize()).observe(document.querySelector('#map'));
+  </script>
+</body>
+</html>
