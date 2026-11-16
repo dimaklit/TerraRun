@@ -1,0 +1,13 @@
+name = "terrarun-garmin"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+SITE_URL = "https://dimaklit.github.io/TerraRun/"
+ALLOWED_ORIGIN = "https://dimaklit.github.io"
+# Fill after first deploy and from Neon Auth settings:
+WORKER_URL = "https://terrarun-garmin.<account>.workers.dev"
+NEON_AUTH_JWKS_URL = "https://<neon-auth-host>/neondb/auth/.well-known/jwks.json"
+
+# Secrets (wrangler secret put): DATABASE_URL, GARMIN_CLIENT_ID, GARMIN_CLIENT_SECRET, STATE_SECRET, WEBHOOK_SECRET

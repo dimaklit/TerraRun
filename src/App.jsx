@@ -25,6 +25,15 @@ import {
 } from 'lucide-react';
 import { parseRouteFile } from './utils/geo.js';
 import { loadPrivateActivities, savePrivateActivities } from './utils/activityStore.js';
+import {
+  activityToFile,
+  disconnectGarmin,
+  garminEnabled,
+  isGarminLinked,
+  loadPendingExternalActivities,
+  markExternalActivitiesImported,
+  startGarminConnect,
+} from './utils/garmin.js';
 import { calculateRouteMetrics, calculateSharedAreaSqKm } from './utils/routeMetrics.js';
 import { calculateTerritoryControl, getControlledAreaSqKm, selectControlledTerritories } from './utils/territoryControl.js';
 import { filterRoutes, getRouteColor, routePeriods } from './utils/routeFilters.js';
@@ -150,6 +159,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const [showRunnerMenu, setShowRunnerMenu] = useState(false);
   const [currentRunner, setCurrentRunner] = useState(() => user?.email ?? 'Mila Chen');
   const [storageState, setStorageState] = useState(() => user ? 'loading' : 'ready');
+  const [garminLinked, setGarminLinked] = useState(false);
   const [storageError, setStorageError] = useState('');
   const [storageAttempt, setStorageAttempt] = useState(0);
   const [selectedClaim, setSelectedClaim] = useState(null);
@@ -201,6 +211,27 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     });
     return () => { active = false; };
   }, [client, user, storageAttempt]);
+
+  useEffect(() => {
+    if (!garminEnabled || !user || !client || storageState !== 'ready') return undefined;
+    let active = true;
+    (async () => {
+      try {
+        const linked = await isGarminLinked(client);
+        if (!active) return;
+        setGarminLinked(linked);
+        if (!linked) return;
+        const pending = await loadPendingExternalActivities(client, user.id);
+        if (!active || !pending.length) return;
+        if (await handleFiles(pending.map(activityToFile))) {
+          await markExternalActivitiesImported(client, user.id, pending.map((activity) => activity.id));
+        }
+      } catch (error) {
+        if (active) setNotice(error instanceof Error ? error.message : 'Garmin sync failed.');
+      }
+    })();
+    return () => { active = false; };
+  }, [client, user, storageState]);
 
   const controlledTerritories = useMemo(() => calculateTerritoryControl(claims), [claims]);
   const totalArea = useMemo(() => getControlledAreaSqKm(controlledTerritories), [controlledTerritories]);
@@ -406,8 +437,10 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
       if (flaggedCount) summary.push(`Speed review required for ${flaggedCount} routes.`);
       if (capturedCount === 0 && flaggedCount === 0 && importedRoutes.length > 0) summary.push('No enclosed areas found.');
       setNotice(summary.join(' '));
+      return true;
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Unable to process the file.');
+      return false;
     } finally {
       importing.current = false;
     }
@@ -458,7 +491,20 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
           </button>
           {showRunnerMenu && <div className="runner-menu" role="group" aria-label={user ? 'Account actions' : 'Choose runner'}>
             {user
-              ? <button onClick={onSignOut}>Sign out</button>
+              ? <>
+                {garminEnabled && (garminLinked
+                  ? <button onClick={async () => {
+                    try {
+                      await disconnectGarmin(client);
+                      setGarminLinked(false);
+                      setNotice('Garmin disconnected.');
+                    } catch (error) {
+                      setNotice(error instanceof Error ? error.message : 'Unable to disconnect Garmin.');
+                    }
+                  }}>Disconnect Garmin</button>
+                  : <button onClick={() => startGarminConnect(client).catch((error) => setNotice(error.message))}>Connect Garmin</button>)}
+                <button onClick={onSignOut}>Sign out</button>
+              </>
               : [...new Set(demoClaims.map((claim) => claim.username))].map((username) => <button key={username} aria-pressed={currentRunner === username} onClick={() => {
                 setCurrentRunner(username);
                 setShowRunnerMenu(false);

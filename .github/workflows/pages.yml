@@ -28,6 +28,7 @@ jobs:
       - run: npm run build
         env:
           VITE_NEON_DATABASE_URL: ${{ vars.VITE_NEON_DATABASE_URL }}
+          VITE_GARMIN_WORKER_URL: ${{ vars.VITE_GARMIN_WORKER_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
