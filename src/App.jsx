@@ -24,6 +24,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { parseRouteFile } from './utils/geo.js';
+import { loadPrivateActivities, savePrivateActivities } from './utils/activityStore.js';
 import { calculateRouteMetrics, calculateSharedAreaSqKm } from './utils/routeMetrics.js';
 import { calculateTerritoryControl, getControlledAreaSqKm, selectControlledTerritories } from './utils/territoryControl.js';
 import { filterRoutes, getRouteColor, routePeriods } from './utils/routeFilters.js';
@@ -125,18 +126,19 @@ function RouteSelectionPanel({ runnerName, routesInPeriod, selectedRouteIds, per
   );
 }
 
-function App() {
+function App({ user = null, client = null, onSignOut, authMessage }) {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const fileInput = useRef(null);
-  const [claims, setClaims] = useState(() => demoClaims.map((claim, index) => ({
+  const [claims, setClaims] = useState(() => user ? [] : demoClaims.map((claim, index) => ({
     ...claim,
     recordedAt: demoRoutes[index].recordedAt,
     activityKey: claim.routeId,
     polygon: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [claim.coordinates] } },
   })));
-  const [routes, setRoutes] = useState(demoRoutes);
+  const [routes, setRoutes] = useState(() => user ? [] : demoRoutes);
   const [routeSelections, setRouteSelections] = useState(() => {
+    if (user) return { [user.id]: new Set() };
     const routeIds = demoRoutes.map((route) => route.id);
     return Object.fromEntries([...new Set(demoClaims.map((claim) => claim.username))].map((username) => [username, new Set(routeIds)]));
   });
@@ -146,7 +148,10 @@ function App() {
   const [showBoard, setShowBoard] = useState(true);
   const [showPanel, setShowPanel] = useState(true);
   const [showRunnerMenu, setShowRunnerMenu] = useState(false);
-  const [currentRunner, setCurrentRunner] = useState('Mila Chen');
+  const [currentRunner, setCurrentRunner] = useState(() => user?.email ?? 'Mila Chen');
+  const [storageState, setStorageState] = useState(() => user ? 'loading' : 'ready');
+  const [storageError, setStorageError] = useState('');
+  const [storageAttempt, setStorageAttempt] = useState(0);
   const [selectedClaim, setSelectedClaim] = useState(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapStyle, setMapStyle] = useState('positron');
@@ -159,15 +164,52 @@ function App() {
   const visibleRoutesRef = useRef([]);
   const activeTabRef = useRef(activeTab);
   const showTowersRef = useRef(showTowers);
+  const importing = useRef(false);
   activeTabRef.current = activeTab;
   showTowersRef.current = showTowers;
 
+  useEffect(() => {
+    if (!user || !client) return undefined;
+    let active = true;
+    setStorageState('loading');
+    setStorageError('');
+    loadPrivateActivities(client, user.id).then((activities) => {
+      if (!active) return;
+      const routesForUser = activities.map(({ route, activity_key: activityKey, recorded_at: recordedAt }) => ({
+        ...route,
+        username: user.email ?? 'You',
+        activityKey,
+        recordedAt: Date.parse(recordedAt),
+      }));
+      const claimsForUser = activities.flatMap(({ claim, route, activity_key: activityKey, recorded_at: recordedAt }) => claim ? [{
+        ...claim,
+        routeId: route.id,
+        username: user.email ?? 'You',
+        activityKey,
+        recordedAt: Date.parse(recordedAt),
+      }] : []);
+      setRoutes(routesForUser);
+      setClaims(claimsForUser);
+      setRouteSelections({ [user.id]: new Set(routesForUser.map((route) => route.id)) });
+      importedActivityKeys.current = new Set(activities.map((activity) => activity.activity_key));
+      nextRouteColor.current = demoRoutes.length + routesForUser.length;
+      setStorageState('ready');
+    }).catch((error) => {
+      if (!active) return;
+      setStorageError(error instanceof Error ? error.message : 'Unable to load your activities.');
+      setStorageState('error');
+    });
+    return () => { active = false; };
+  }, [client, user, storageAttempt]);
+
   const controlledTerritories = useMemo(() => calculateTerritoryControl(claims), [claims]);
   const totalArea = useMemo(() => getControlledAreaSqKm(controlledTerritories), [controlledTerritories]);
-  const selectedRouteIds = routeSelections[currentRunner] ?? new Set(routes.map((route) => route.id));
+  const runnerName = user?.email ?? currentRunner;
+  const runnerKey = user?.id ?? currentRunner;
+  const selectedRouteIds = routeSelections[runnerKey] ?? new Set(routes.map((route) => route.id));
   const updateRouteSelection = (update) => setRouteSelections((current) => {
-    const selected = current[currentRunner] ?? new Set(routes.map((route) => route.id));
-    return { ...current, [currentRunner]: update(selected) };
+    const selected = current[runnerKey] ?? new Set(routes.map((route) => route.id));
+    return { ...current, [runnerKey]: update(selected) };
   });
   const routesInPeriod = useMemo(() => filterRoutes(routes, new Set(routes.map((route) => route.id)), routePeriod), [routes, routePeriod]);
   const visibleRoutes = useMemo(() => filterRoutes(routes, selectedRouteIds, routePeriod), [routes, selectedRouteIds, routePeriod]);
@@ -179,8 +221,8 @@ function App() {
   ), [claims, visibleRoutes]);
   claimsRef.current = visibleClaims;
   visibleRoutesRef.current = visibleRoutes;
-  const ownedClaims = controlledTerritories.filter((territory) => territory.properties.username === currentRunner);
-  const myArea = getControlledAreaSqKm(controlledTerritories, currentRunner);
+  const ownedClaims = controlledTerritories.filter((territory) => territory.properties.username === runnerName);
+  const myArea = getControlledAreaSqKm(controlledTerritories, runnerName);
   const leaderboard = [...new Set(claims.map((claim) => claim.username))]
     .map((username) => ({
       username,
@@ -282,7 +324,8 @@ function App() {
   }, [notice]);
 
   async function handleFiles(files) {
-    if (!files?.length) return;
+    if (!files?.length || importing.current || storageState !== 'ready') return;
+    importing.current = true;
     try {
       const parsedFiles = await Promise.all(Array.from(files).map(async (file) => ({
         file,
@@ -300,7 +343,7 @@ function App() {
       for (const { file, routes: parsedRoutes } of parsedFiles) {
         const baseName = file.name.replace(/\.(gpx|geojson|json)$/i, '');
         for (const [partIndex, parsed] of parsedRoutes.entries()) {
-          const activityKey = `${currentRunner}:${parsed.activityKey}`;
+          const activityKey = `${runnerName}:${parsed.activityKey}`;
           if (importedActivityKeys.current.has(activityKey) || batchKeys.has(activityKey)) {
             duplicateCount += 1;
             continue;
@@ -314,7 +357,7 @@ function App() {
             name,
             coordinates: parsed.coordinates,
             color,
-            username: currentRunner,
+            username: runnerName,
             activityKey,
             distanceKm: parsed.routeDistanceKm,
             areaSqKm: parsed.areaSqKm,
@@ -332,7 +375,7 @@ function App() {
               id,
               routeId: id,
               name,
-              username: currentRunner,
+              username: runnerName,
               activityKey,
               recordedAt: route.recordedAt,
               color,
@@ -344,6 +387,9 @@ function App() {
         }
       }
 
+      if (user && client && importedRoutes.length) {
+        await savePrivateActivities(client, user.id, importedRoutes, newClaims);
+      }
       setRoutes((current) => [...importedRoutes, ...current]);
       batchKeys.forEach((key) => importedActivityKeys.current.add(key));
       updateRouteSelection((current) => new Set([...current, ...importedRoutes.map((route) => route.id)]));
@@ -362,6 +408,8 @@ function App() {
       setNotice(summary.join(' '));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Unable to process the file.');
+    } finally {
+      importing.current = false;
     }
   }
 
@@ -403,16 +451,18 @@ function App() {
           </button>
         </div>
         <div className="runner-control">
-          <button className="runner-select" title="Switch runner" aria-label="Switch runner" aria-expanded={showRunnerMenu} onClick={() => setShowRunnerMenu(!showRunnerMenu)}>
-            <span className="runner-avatar">{currentRunner.split(' ').map((part) => part[0]).join('')}</span>
-            <span className="runner-name">{currentRunner}</span>
+          <button className="runner-select" title={user ? 'Account menu' : 'Switch runner'} aria-label={user ? 'Account menu' : 'Switch runner'} aria-expanded={showRunnerMenu} onClick={() => setShowRunnerMenu(!showRunnerMenu)}>
+            <span className="runner-avatar">{user ? (user.email?.[0] ?? 'U').toUpperCase() : currentRunner.split(' ').map((part) => part[0]).join('')}</span>
+            <span className="runner-name">{runnerName}</span>
             <ChevronDown size={14} />
           </button>
-          {showRunnerMenu && <div className="runner-menu" role="group" aria-label="Choose runner">
-            {[...new Set(demoClaims.map((claim) => claim.username))].map((username) => <button key={username} aria-pressed={currentRunner === username} onClick={() => {
-              setCurrentRunner(username);
-              setShowRunnerMenu(false);
-            }}>{username}</button>)}
+          {showRunnerMenu && <div className="runner-menu" role="group" aria-label={user ? 'Account actions' : 'Choose runner'}>
+            {user
+              ? <button onClick={onSignOut}>Sign out</button>
+              : [...new Set(demoClaims.map((claim) => claim.username))].map((username) => <button key={username} aria-pressed={currentRunner === username} onClick={() => {
+                setCurrentRunner(username);
+                setShowRunnerMenu(false);
+              }}>{username}</button>)}
           </div>}
         </div>
       </header>
@@ -423,7 +473,7 @@ function App() {
           selectedRouteIds={selectedRouteIds}
           period={routePeriod}
           onPeriodChange={setRoutePeriod}
-          runnerName={currentRunner}
+          runnerName={runnerName}
           onToggleRoute={(routeId) => updateRouteSelection((current) => {
             const next = new Set(current);
             if (next.has(routeId)) next.delete(routeId);
@@ -449,7 +499,13 @@ function App() {
         <div className="area-readout">
           <span className="readout-label">YOUR CONTROL</span>
           <div className="readout-value">{myArea.toFixed(3)}<span> km²</span></div>
-          <div className="readout-foot">{ownedClaims.length} controlled {ownedClaims.length === 1 ? 'region' : 'regions'} · {currentRunner}</div>
+          <div className="readout-foot">{ownedClaims.length} controlled {ownedClaims.length === 1 ? 'region' : 'regions'} · {runnerName}</div>
+          {user && <div className="account-storage-state" role={storageState === 'error' ? 'alert' : 'status'}>
+            {storageState === 'loading' && 'Syncing your private activities…'}
+            {storageState === 'ready' && 'Private activity sync · Neon'}
+            {storageState === 'error' && <>{storageError} <button className="text-button" onClick={() => setStorageAttempt((attempt) => attempt + 1)}>RETRY</button></>}
+          </div>}
+          {authMessage && <div className="account-storage-state" role="status">{authMessage}</div>}
         </div>
         <div className="panel-rule" />
         <div className="metric-row">
@@ -467,13 +523,15 @@ function App() {
           {visibleClaims.length === 0 && <p className="route-empty-state">No captured territories in the selected routes.</p>}
           {visibleClaims.map((claim) => <button className="territory-target" key={claim.id} onClick={() => inspectClaim(claim)}>
             <span className="territory-swatch" style={{ background: claim.color }}><Flag size={17} /></span>
-            <span><strong>{claim.name}</strong><small>{claim.username === currentRunner ? 'Yours' : claim.username} · Strength {claim.strength} · {claim.areaSqKm.toFixed(3)} km²</small></span>
+            <span><strong>{claim.name}</strong><small>{claim.username === runnerName ? 'Yours' : claim.username} · Strength {claim.strength} · {claim.areaSqKm.toFixed(3)} km²</small></span>
             <ArrowUpRight size={16} />
           </button>)}
         </div>
-        <button className="upload-button territory-import" onClick={() => fileInput.current?.click()}><Footprints size={17} /> IMPORT A RUN <Upload size={16} /></button>
+        <button className="upload-button territory-import" disabled={storageState !== 'ready'} onClick={() => fileInput.current?.click()}><Footprints size={17} /> IMPORT A RUN <Upload size={16} /></button>
         <div className="panel-rule" />
-        <div className="rank-heading"><span className="eyebrow">LOCAL STANDINGS</span><button className="text-button" onClick={() => setShowBoard(!showBoard)}>{showBoard ? 'HIDE' : 'SHOW'}</button></div>
+        {user && storageState === 'loading' && <p className="route-empty-state" role="status">Loading private activity totals…</p>}
+        {user && storageState === 'error' && <p className="route-empty-state" role="alert">{storageError} <button className="text-button" onClick={() => setStorageAttempt((attempt) => attempt + 1)}>Retry</button></p>}
+        <div className="rank-heading"><span className="eyebrow">{user ? 'YOUR PRIVATE ACTIVITY' : 'LOCAL STANDINGS'}</span><button className="text-button" onClick={() => setShowBoard(!showBoard)}>{showBoard ? 'HIDE' : 'SHOW'}</button></div>
         {showBoard && <div className="leaderboard">
           {leaderboard.map((runner, index) => <div className={`rank-row${runner.username === currentRunner ? ' rank-self' : ''}`} key={runner.username}>
             <span className="rank-number">{String(index + 1).padStart(2, '0')}</span>
@@ -482,7 +540,7 @@ function App() {
             <strong>{runner.area.toFixed(3)}</strong><span className="rank-unit">km²</span>
           </div>)}
         </div>}
-        <div className="district-footer"><Trophy size={14} /><span>Captured area totals</span><strong>{totalArea.toFixed(3)} km²</strong></div>
+        <div className="district-footer"><Trophy size={14} /><span>{user ? 'Private captured area' : 'Captured area totals'}</span><strong>{totalArea.toFixed(3)} km²</strong></div>
       </section>)}
 
       <div className="district-label"><span className="status-indicator" /> MANHATTAN <span>/</span> MIDTOWN</div>
@@ -522,8 +580,8 @@ function App() {
         <div className="dock-topline"><span><Activity size={14} /> ACTIVITY IMPORT</span><span className="demo-tag">DEMO</span></div>
         <p>Claim your next sector.</p>
         <div className="dock-meta"><span>GPX / GEOJSON</span><span>MAX 35 KM/H</span></div>
-        <input ref={fileInput} className="visually-hidden" type="file" multiple accept=".gpx,.json,.geojson,application/gpx+xml,application/geo+json,application/json" onChange={(event) => { handleFiles(event.target.files); event.target.value = ''; }} />
-        <button className="upload-button" onClick={() => fileInput.current?.click()}><Upload size={16} /> IMPORT ROUTE <Plus size={16} /></button>
+        <input ref={fileInput} className="visually-hidden" type="file" multiple disabled={storageState !== 'ready'} accept=".gpx,.json,.geojson,application/gpx+xml,application/geo+json,application/json" onChange={(event) => { handleFiles(event.target.files); event.target.value = ''; }} />
+        <button className="upload-button" disabled={storageState !== 'ready'} onClick={() => fileInput.current?.click()}><Upload size={16} /> IMPORT ROUTE <Plus size={16} /></button>
       </aside>
 
       <section className="activity-strip" aria-label="Recent routes">

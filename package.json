@@ -10,7 +10,7 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.0",
+    "@neon/neon-js": "^0.10.2",
     "@tmcw/togeojson": "^7.1.2",
     "@turf/turf": "^7.2.0",
     "lucide-react": "^0.468.0",
