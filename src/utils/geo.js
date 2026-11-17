@@ -37,8 +37,13 @@ export function extractRouteGeometries(geojson) {
   });
 }
 
+async function hashActivityKey(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export function parseRouteFile(file) {
-  return file.text().then((text) => {
+  return file.text().then(async (text) => {
     let geojson;
 
     if (file.name.toLowerCase().endsWith('.gpx')) {
@@ -56,12 +61,13 @@ export function parseRouteFile(file) {
     const routes = extractRouteGeometries(geojson);
     if (routes.length === 0) throw new Error('The file contains no GPS route lines.');
 
-    return routes.map(({ name, coordinates, times }) => ({
+    return Promise.all(routes.map(async ({ name, coordinates, times }) => ({
       name,
       coordinates,
-      activityKey: JSON.stringify({ coordinates, times, name: name ?? file.name }),
+      // Hashed so it stays small enough for the unique btree indexes.
+      activityKey: await hashActivityKey(JSON.stringify({ coordinates, times, name: name ?? file.name })),
       recordedAt: times.find((time) => Number.isFinite(time)),
       ...calculateRouteMetrics(coordinates, times),
-    }));
+    })));
   });
 }

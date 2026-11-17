@@ -229,7 +229,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
           await markExternalActivitiesImported(client, user.id, pending.map((activity) => activity.id));
         }
       } catch (error) {
-        if (active) setNotice(error instanceof Error ? error.message : 'Garmin sync failed.');
+        if (active) setNotice(error?.message ?? 'Garmin sync failed.');
       }
     })();
     return () => { active = false; };
@@ -245,7 +245,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         const rivals = await loadRivalClaims(client);
         if (active) setRivalClaims(rivals);
       } catch (error) {
-        if (active) setNotice(error instanceof Error ? error.message : 'Unable to sync shared territories.');
+        if (active) setNotice(error?.message ?? 'Unable to sync shared territories.');
       }
     })();
     return () => { active = false; };
@@ -459,7 +459,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
       setNotice(summary.join(' '));
       return true;
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Unable to process the file.');
+      setNotice(error?.message ?? 'Unable to process the file.');
       return false;
     } finally {
       importing.current = false;

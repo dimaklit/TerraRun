@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractRouteGeometries } from './geo.js';
+import { extractRouteGeometries, parseRouteFile } from './geo.js';
 
 test('extracts every route from a GeoJSON FeatureCollection', () => {
   const routes = extractRouteGeometries({
@@ -34,4 +34,14 @@ test('splits MultiLineString parts into routes and keeps coordinate times', () =
   assert.equal(routes.length, 2);
   assert.deepEqual(routes[0].times, [Date.parse('2026-11-09T08:00:00Z'), Date.parse('2026-11-09T08:01:00Z')]);
   assert.deepEqual(routes[1].times, [Date.parse('2026-11-09T08:02:00Z'), Date.parse('2026-11-09T08:03:00Z')]);
+});
+
+test('parseRouteFile produces a short hashed activity key safe for btree indexes', async () => {
+  const coordinates = Array.from({ length: 300 }, (unused, index) => [34.81 + index * 0.0001, 31.25 + index * 0.0001]);
+  const geojson = JSON.stringify({ type: 'Feature', properties: { name: 'Long Run' }, geometry: { type: 'LineString', coordinates } });
+  const file = { name: 'long-run.geojson', text: async () => geojson };
+  const [route] = await parseRouteFile(file);
+  assert.match(route.activityKey, /^[0-9a-f]{64}$/);
+  const [again] = await parseRouteFile(file);
+  assert.equal(route.activityKey, again.activityKey);
 });
