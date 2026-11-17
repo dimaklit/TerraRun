@@ -26,7 +26,9 @@ Set `WORKER_URL` and `NEON_AUTH_JWKS_URL` (Neon Auth JWKS endpoint) in `wrangler
 
 In the Garmin developer portal set:
 - Redirect URI: `<WORKER_URL>/garmin/callback`
-- Activity file webhook: `<WORKER_URL>/garmin/webhook?key=<WEBHOOK_SECRET>`
-- Deregistration webhook: `<WORKER_URL>/garmin/deregister?key=<WEBHOOK_SECRET>`
+- Activity file webhook: `<WORKER_URL>/garmin/webhook/<WEBHOOK_SECRET>`
+- Deregistration webhook: `<WORKER_URL>/garmin/deregister/<WEBHOOK_SECRET>`
+
+The secret is part of the path because the Garmin endpoint configuration tool strips query strings. A `?key=<WEBHOOK_SECRET>` query parameter is also accepted.
 
 Finally add the GitHub Actions variable `VITE_GARMIN_WORKER_URL` (and `VITE_GARMIN_WORKER_URL` in `.env.local` for local dev) so the app shows "Connect Garmin" in the account menu.

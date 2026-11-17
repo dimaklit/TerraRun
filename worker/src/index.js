@@ -126,8 +126,14 @@ async function importActivityFile(env, sql, file) {
     on conflict (user_id, provider, external_id) do nothing`;
 }
 
-async function handleWebhook(env, request, ctx) {
-  if (new URL(request.url).searchParams.get('key') !== env.WEBHOOK_SECRET) return new Response('Forbidden', { status: 403 });
+function webhookAuthorized(env, request, pathname, prefix) {
+  const fromPath = pathname.startsWith(`${prefix}/`) ? decodeURIComponent(pathname.slice(prefix.length + 1)) : null;
+  const key = fromPath ?? new URL(request.url).searchParams.get('key');
+  return key === env.WEBHOOK_SECRET;
+}
+
+async function handleWebhook(env, request, ctx, pathname) {
+  if (!webhookAuthorized(env, request, pathname, '/garmin/webhook')) return new Response('Forbidden', { status: 403 });
   const body = await request.json().catch(() => ({}));
   const sql = neon(env.DATABASE_URL);
   // Garmin expects a fast 200; downloads continue after the response.
@@ -136,8 +142,8 @@ async function handleWebhook(env, request, ctx) {
   return new Response('OK');
 }
 
-async function handleDeregistration(env, request) {
-  if (new URL(request.url).searchParams.get('key') !== env.WEBHOOK_SECRET) return new Response('Forbidden', { status: 403 });
+async function handleDeregistration(env, request, pathname) {
+  if (!webhookAuthorized(env, request, pathname, '/garmin/deregister')) return new Response('Forbidden', { status: 403 });
   const body = await request.json().catch(() => ({}));
   const sql = neon(env.DATABASE_URL);
   for (const item of body.deregistrations ?? []) {
@@ -153,8 +159,8 @@ export default {
     try {
       if (pathname === '/garmin/connect' && request.method === 'POST') return await startConnect(env, request);
       if (pathname === '/garmin/callback' && request.method === 'GET') return await finishConnect(env, request);
-      if (pathname === '/garmin/webhook' && request.method === 'POST') return await handleWebhook(env, request, ctx);
-      if (pathname === '/garmin/deregister' && request.method === 'POST') return await handleDeregistration(env, request);
+      if ((pathname === '/garmin/webhook' || pathname.startsWith('/garmin/webhook/')) && request.method === 'POST') return await handleWebhook(env, request, ctx, pathname);
+      if ((pathname === '/garmin/deregister' || pathname.startsWith('/garmin/deregister/')) && request.method === 'POST') return await handleDeregistration(env, request, pathname);
       if (pathname === '/garmin/connection' && request.method === 'DELETE') {
         const userId = await authenticate(env, request);
         await neon(env.DATABASE_URL)`delete from public.garmin_connections where user_id = ${userId}`;
