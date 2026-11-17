@@ -181,6 +181,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const activeTabRef = useRef(activeTab);
   const showTowersRef = useRef(showTowers);
   const importing = useRef(false);
+  const fittedToOwnRoutes = useRef(false);
   activeTabRef.current = activeTab;
   showTowersRef.current = showTowers;
 
@@ -238,6 +239,15 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     })();
     return () => { active = false; };
   }, [client, user, storageState]);
+
+  // Fly to the player's own routes once after they load; the default view is only a fallback.
+  useEffect(() => {
+    if (!user || !mapReady || storageState !== 'ready' || fittedToOwnRoutes.current || !routes.length) return;
+    fittedToOwnRoutes.current = true;
+    const coordinates = routes.flatMap((route) => route.coordinates);
+    const bounds = coordinates.reduce((result, point) => result.extend(point), new maplibregl.LngLatBounds(coordinates[0], coordinates[0]));
+    mapRef.current?.fitBounds(bounds, { padding: window.innerWidth <= 760 ? 50 : 110, maxZoom: 15 });
+  }, [user, mapReady, storageState, routes]);
 
   // Shared combat layer: publish own claims anonymously and load rival territories.
   useEffect(() => {
