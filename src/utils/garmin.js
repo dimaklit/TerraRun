@@ -1,10 +1,24 @@
 const workerUrl = (import.meta.env.VITE_GARMIN_WORKER_URL ?? '').replace(/\/$/, '');
+const neonBaseUrl = import.meta.env.VITE_NEON_DATABASE_URL ?? '';
 
-export const garminEnabled = Boolean(workerUrl);
+export const garminEnabled = Boolean(workerUrl && neonBaseUrl);
+
+// Mirrors how @neon/neon-js derives the auth host from the base URL.
+function authTokenUrl() {
+  const url = new URL(neonBaseUrl);
+  const [first, ...rest] = url.hostname.split('.');
+  return `${url.protocol}//${[first, 'neonauth', ...rest].join('.')}${url.pathname}/auth/token`;
+}
+
+async function getJwt() {
+  const response = await fetch(authTokenUrl(), { credentials: 'include' });
+  const { token } = response.ok ? await response.json() : {};
+  if (!token) throw new Error('You are signed out.');
+  return token;
+}
 
 async function workerFetch(client, path, init = {}) {
-  const token = await client.auth.getJWTToken();
-  if (!token) throw new Error('You are signed out.');
+  const token = await getJwt();
   const response = await fetch(`${workerUrl}${path}`, {
     ...init,
     headers: { ...init.headers, Authorization: `Bearer ${token}` },
