@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TerraRun — איך משחקים</title>
+  <style>
+    :root { --green: #1e5631; --accent: #b8ff5c; --ink: #1c2430; --muted: #5a6676; }
+    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; max-width: 760px; margin: 0 auto; padding: 2rem 1.25rem 4rem; color: var(--ink); line-height: 1.7; background: #f4f7f2; }
+    h1 { font-size: 2rem; color: var(--green); margin-bottom: 0.25rem; }
+    h2 { font-size: 1.3rem; color: var(--green); margin-top: 2.5rem; display: flex; align-items: center; gap: 0.5rem; }
+    .step-num { background: var(--green); color: #fff; border-radius: 50%; width: 1.8rem; height: 1.8rem; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+    .lead { font-size: 1.1rem; color: var(--muted); }
+    img.shot { width: 100%; border-radius: 12px; border: 1px solid #d8e0d4; box-shadow: 0 4px 18px rgba(30,86,49,0.12); margin: 0.75rem 0 0.5rem; }
+    .caption { font-size: 0.85rem; color: var(--muted); margin-top: 0; }
+    .rules { background: #fff; border: 1px solid #d8e0d4; border-radius: 12px; padding: 1rem 1.5rem; margin: 1rem 0; }
+    .rules li { margin: 0.5rem 0; }
+    .cta { display: block; text-align: center; background: var(--green); color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 700; padding: 1rem; border-radius: 12px; margin-top: 2.5rem; }
+    .cta:hover { background: #2a7344; }
+    .tip { background: #eef7e6; border-right: 4px solid var(--green); padding: 0.6rem 1rem; border-radius: 8px; margin: 1rem 0; }
+    svg { display: block; margin: 0.75rem auto; }
+    footer { margin-top: 3rem; font-size: 0.85rem; color: var(--muted); text-align: center; }
+    footer a { color: var(--green); }
+  </style>
+</head>
+<body>
+  <h1>🏃‍♂️ TerraRun — כובשים את הרחובות</h1>
+  <p class="lead">משחק לרצים: כל ריצה שלכם הופכת לשטח כבוש על מפת העיר. רצים לולאה — השטח שבפנים שלכם. מפסיקים לרוץ — מישהו אחר ייקח לכם אותו.</p>
+
+  <h2><span class="step-num">1</span> נרשמים</h2>
+  <p>נכנסים לאתר, לוחצים על <b>Create an account</b>, בוחרים אימייל וסיסמה — וזהו. בלי אימותים מסובכים.</p>
+  <img class="shot" src="guide-signin.png" alt="מסך ההרשמה של TerraRun" />
+  <p class="caption">ההרשמה לוקחת חצי דקה. הריצות שלכם פרטיות — אף אחד לא רואה את המסלולים שלכם.</p>
+
+  <h2><span class="step-num">2</span> מעלים ריצה</h2>
+  <p>שתי דרכים:</p>
+  <ul class="rules">
+    <li>📂 <b>קובץ:</b> מייצאים ריצה מהשעון או מהאפליקציה (GPX או GeoJSON) ולוחצים <b>IMPORT ROUTE</b>.</li>
+    <li>⌚ <b>Garmin:</b> בתפריט החשבון (העיגול למעלה מימין) לוחצים <b>Connect Garmin</b> — ומאז כל ריצה חדשה נכנסת לבד, בלי להרים אצבע.</li>
+  </ul>
+  <img class="shot" src="guide-garmin.png" alt="תפריט החשבון עם חיבור Garmin" />
+  <p class="caption">חיבור Garmin הוא חד-פעמי. אחרי זה — מסנכרנים ריצה בשעון והיא מופיעה במשחק.</p>
+
+  <h2><span class="step-num">3</span> כובשים שטח</h2>
+  <p>הקסם: אם המסלול שלכם <b>סוגר לולאה</b> (מסיימים קרוב לנקודת ההתחלה, או חוצים את המסלול של עצמכם) — כל השטח שבפנים נצבע בצבע שלכם:</p>
+  <img class="shot" src="guide-territory.png" alt="שטח כבוש על המפה" />
+  <p class="caption">ריצה של 2 ק&quot;מ בשכונה = 0.288 קמ&quot;ר כבושים. רואים בדיוק כמה שטח יש לכם.</p>
+  <svg viewBox="0 0 640 180" width="100%" role="img" aria-label="מסלול פתוח לא כובש, לולאה סגורה כובשת">
+    <rect width="640" height="180" fill="#ffffff" rx="12"/>
+    <path d="M 60 130 Q 110 60 170 95 T 280 80" fill="none" stroke="#5a6676" stroke-width="4" stroke-dasharray="7 5" stroke-linecap="round"/>
+    <text x="170" y="160" text-anchor="middle" font-size="15" fill="#5a6676">מסלול פתוח — אין שטח 😕</text>
+    <path d="M 420 50 L 560 60 L 580 120 L 490 150 L 405 115 Z" fill="#b8ff5c" fill-opacity="0.55" stroke="#1e5631" stroke-width="4" stroke-linejoin="round"/>
+    <text x="495" y="105" text-anchor="middle" font-size="22">🏆</text>
+    <text x="495" y="172" text-anchor="middle" font-size="15" fill="#1e5631" font-weight="bold">לולאה סגורה — השטח שלכם! 🎉</text>
+  </svg>
+
+  <h2><span class="step-num">4</span> נלחמים על השכונה</h2>
+  <p>כאן מתחיל המשחק האמיתי:</p>
+  <ul class="rules">
+    <li>💪 כל ריצה נוספת על השטח שלכם <b>מחזקת</b> אותו (+1 עוצמה).</li>
+    <li>⚔️ ריצה של יריב על השטח שלכם <b>מחלישה</b> אותו (‎-1 עוצמה). בעוצמה 0 השטח הופך ניטרלי, ובריצה הבאה — עובר אליו.</li>
+    <li>👻 היריבים <b>אנונימיים לגמרי</b>: רואים רק צבע ושם קוד כמו ‎Rival 7F4B — אף פעם לא שם, אימייל או מסלול.</li>
+    <li>🚫 אנטי-צ'יטינג: ריצה מהירה מדי (מעל 35 קמ&quot;ש לאורך זמן — כלומר רכב) לא כובשת שטח.</li>
+  </ul>
+  <svg viewBox="0 0 640 200" width="100%" role="img" aria-label="קרב על שטח: החפיפה בין שני שחקנים נחלשת">
+    <rect width="640" height="200" fill="#ffffff" rx="12"/>
+    <rect x="70" y="40" width="240" height="120" rx="10" fill="#b8ff5c" fill-opacity="0.55" stroke="#1e5631" stroke-width="3"/>
+    <rect x="250" y="60" width="240" height="120" rx="10" fill="#ff5e7d" fill-opacity="0.45" stroke="#c2185b" stroke-width="3"/>
+    <rect x="250" y="60" width="60" height="100" rx="6" fill="#9aa4b2" fill-opacity="0.65" stroke="#5a6676" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="160" y="105" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e5631">השטח שלכם</text>
+    <text x="400" y="130" text-anchor="middle" font-size="14" font-weight="bold" fill="#c2185b">יריב אנונימי</text>
+    <text x="280" y="45" text-anchor="middle" font-size="13" fill="#5a6676">⚔️ אזור קרב</text>
+    <text x="320" y="192" text-anchor="middle" font-size="13" fill="#5a6676">בחפיפה — מי שרץ שם יותר פעמים, שולט</text>
+  </svg>
+  <div class="tip">💡 <b>טיפ:</b> רוצים אימפריה? תרוצו כל שבוע את אותה לולאה — העוצמה מצטברת וקשה לגנוב לכם אותה.</div>
+
+  <h2><span class="step-num">5</span> עוקבים אחרי המסלולים</h2>
+  <p>בלשונית <b>Routes</b> רואים את כל הריצות, מסננים לפי תקופה ובוחרים מה להציג על המפה:</p>
+  <img class="shot" src="guide-routes.png" alt="רשימת מסלולים וסינון" />
+
+  <a class="cta" href="https://dimaklit.github.io/TerraRun/">🏁 מתחילים לשחק — TerraRun</a>
+
+  <footer>
+    חינם, בלי פרסומות. הנתונים שלכם פרטיים — <a href="privacy.html">מדיניות פרטיות</a>.
+  </footer>
+</body>
+</html>
