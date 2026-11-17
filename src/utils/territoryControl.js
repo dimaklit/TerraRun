@@ -72,7 +72,7 @@ export function selectRivalTerritories(territories) {
     return [{
       ...territory.properties,
       id: `rival-territory-${index}`,
-      name: 'Rival territory',
+      name: territory.properties.name ?? 'Rival territory',
       username: 'Anonymous rival',
       routeId: null,
       areaSqKm: area(territory) / 1_000_000,

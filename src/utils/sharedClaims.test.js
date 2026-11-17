@@ -1,15 +1,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadRivalClaims, publishClaims, rivalFromFeedRow } from './sharedClaims.js';
+import { loadRivalClaims, publishClaims, rivalColorFromToken, rivalFromFeedRow } from './sharedClaims.js';
 
 const polygon = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] } };
 
 test('rival feed rows become anonymous combat activities', () => {
   const rival = rivalFromFeedRow({ id: 'abc', owner_token: 'deadbeef', claim: { polygon, areaSqKm: 0.5 }, recorded_at: '2026-11-17T08:00:00Z' });
   assert.equal(rival.username, 'rival:deadbeef');
-  assert.equal(rival.name, 'Rival territory');
+  assert.equal(rival.name, 'Rival DEAD');
   assert.equal(rival.recordedAt, Date.parse('2026-11-17T08:00:00Z'));
   assert.deepEqual(rival.polygon, polygon);
+});
+
+test('each rival token gets a unique stable color', () => {
+  const first = rivalColorFromToken('deadbeef00');
+  assert.equal(first, rivalColorFromToken('deadbeef00'));
+  assert.match(first, /^hsl\(\d+, 82%, 58%\)$/);
+  assert.notEqual(first, rivalColorFromToken('cafebabe00'));
 });
 
 test('publishClaims sends only polygon and area, skips open routes, ignores duplicates', async () => {

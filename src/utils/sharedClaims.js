@@ -1,4 +1,8 @@
-export const rivalColor = '#ff5e7d';
+// Stable anonymous color: derived from the owner token, unique per rival.
+export function rivalColorFromToken(token) {
+  const hue = parseInt(String(token).slice(0, 8), 16) % 360;
+  return `hsl(${hue}, 82%, 58%)`;
+}
 
 export function rivalFromFeedRow(row) {
   return {
@@ -6,8 +10,8 @@ export function rivalFromFeedRow(row) {
     routeId: `rival-${row.id}`,
     activityKey: `rival-${row.id}`,
     username: `rival:${row.owner_token}`,
-    name: 'Rival territory',
-    color: rivalColor,
+    name: `Rival ${String(row.owner_token).slice(0, 4).toUpperCase()}`,
+    color: rivalColorFromToken(row.owner_token),
     recordedAt: Date.parse(row.recorded_at),
     polygon: row.claim.polygon,
     areaSqKm: row.claim.areaSqKm ?? 0,
