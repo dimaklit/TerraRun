@@ -35,7 +35,8 @@ import {
   startGarminConnect,
 } from './utils/garmin.js';
 import { calculateRouteMetrics, calculateSharedAreaSqKm } from './utils/routeMetrics.js';
-import { calculateTerritoryControl, getControlledAreaSqKm, selectControlledTerritories } from './utils/territoryControl.js';
+import { calculateTerritoryControl, getControlledAreaSqKm, selectControlledTerritories, selectRivalTerritories } from './utils/territoryControl.js';
+import { loadRivalClaims, publishClaims } from './utils/sharedClaims.js';
 import { filterRoutes, getRouteColor, routePeriods } from './utils/routeFilters.js';
 
 const dayMs = 24 * 60 * 60 * 1000;
@@ -160,6 +161,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const [currentRunner, setCurrentRunner] = useState(() => user?.email ?? 'Mila Chen');
   const [storageState, setStorageState] = useState(() => user ? 'loading' : 'ready');
   const [garminLinked, setGarminLinked] = useState(false);
+  const [rivalClaims, setRivalClaims] = useState([]);
   const [storageError, setStorageError] = useState('');
   const [storageAttempt, setStorageAttempt] = useState(0);
   const [selectedClaim, setSelectedClaim] = useState(null);
@@ -233,8 +235,24 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     return () => { active = false; };
   }, [client, user, storageState]);
 
-  const controlledTerritories = useMemo(() => calculateTerritoryControl(claims), [claims]);
-  const totalArea = useMemo(() => getControlledAreaSqKm(controlledTerritories), [controlledTerritories]);
+  // Shared combat layer: publish own claims anonymously and load rival territories.
+  useEffect(() => {
+    if (!user || !client || storageState !== 'ready') return undefined;
+    let active = true;
+    (async () => {
+      try {
+        await publishClaims(client, claims);
+        const rivals = await loadRivalClaims(client);
+        if (active) setRivalClaims(rivals);
+      } catch (error) {
+        if (active) setNotice(error instanceof Error ? error.message : 'Unable to sync shared territories.');
+      }
+    })();
+    return () => { active = false; };
+  }, [client, user, storageState, claims]);
+
+  const controlledTerritories = useMemo(() => calculateTerritoryControl([...claims, ...rivalClaims]), [claims, rivalClaims]);
+  const totalArea = useMemo(() => getControlledAreaSqKm(controlledTerritories, user ? user.email : undefined), [controlledTerritories, user]);
   const runnerName = user?.email ?? currentRunner;
   const runnerKey = user?.id ?? currentRunner;
   const selectedRouteIds = routeSelections[runnerKey] ?? new Set(routes.map((route) => route.id));
@@ -245,12 +263,14 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const routesInPeriod = useMemo(() => filterRoutes(routes, new Set(routes.map((route) => route.id)), routePeriod), [routes, routePeriod]);
   const visibleRoutes = useMemo(() => filterRoutes(routes, selectedRouteIds, routePeriod), [routes, selectedRouteIds, routePeriod]);
   const visibleClaims = useMemo(() => selectControlledTerritories(controlledTerritories, visibleRoutes, claims), [controlledTerritories, visibleRoutes, claims]);
-  const territoryTowers = useMemo(() => claimCollection(visibleClaims), [visibleClaims]);
+  const rivalTerritories = useMemo(() => selectRivalTerritories(controlledTerritories), [controlledTerritories]);
+  const mapClaims = useMemo(() => [...visibleClaims, ...rivalTerritories], [visibleClaims, rivalTerritories]);
+  const territoryTowers = useMemo(() => claimCollection(mapClaims), [mapClaims]);
   towersRef.current = territoryTowers;
   const sharedAreaSqKm = useMemo(() => calculateSharedAreaSqKm(
     claims.filter((claim) => visibleRoutes.some((route) => route.id === claim.routeId)).map((claim) => claim.polygon),
   ), [claims, visibleRoutes]);
-  claimsRef.current = visibleClaims;
+  claimsRef.current = mapClaims;
   visibleRoutesRef.current = visibleRoutes;
   const ownedClaims = controlledTerritories.filter((territory) => territory.properties.username === runnerName);
   const myArea = getControlledAreaSqKm(controlledTerritories, runnerName);
@@ -332,11 +352,11 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-    mapRef.current.getSource('claims')?.setData(claimCollection(visibleClaims));
+    mapRef.current.getSource('claims')?.setData(claimCollection(mapClaims));
     mapRef.current.getSource('claim-towers')?.setData(territoryTowers);
     mapRef.current.getSource('routes')?.setData(routeCollection(visibleRoutes));
     setSelectedClaim(null);
-  }, [visibleClaims, visibleRoutes, territoryTowers, mapReady]);
+  }, [mapClaims, visibleRoutes, territoryTowers, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -462,7 +482,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     mapRef.current?.fitBounds(bounds, { padding: window.innerWidth <= 760 ? 50 : 130, maxZoom: 15.5, duration: 600 });
   }
 
-  const inspectedClaim = visibleClaims.find((claim) => claim.id === selectedClaim);
+  const inspectedClaim = mapClaims.find((claim) => claim.id === selectedClaim);
   const inspectedRoute = inspectedClaim && routes.find((route) => route.id === inspectedClaim.routeId);
 
   return (
@@ -556,7 +576,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         <div className="panel-rule" />
         <div className="metric-row">
           <div className="metric-icon"><Route size={16} /></div>
-          <div><span className="metric-label">ON THIS MAP</span><strong>{visibleClaims.length.toString().padStart(2, '0')} <small>territories</small></strong></div>
+          <div><span className="metric-label">ON THIS MAP</span><strong>{mapClaims.length.toString().padStart(2, '0')} <small>territories</small></strong></div>
           <span className="metric-side">{visibleRoutes.length} routes</span>
         </div>
         <div className="metric-row">
@@ -566,8 +586,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         <div className="panel-rule" />
         <div className="rank-heading"><span className="eyebrow">TERRITORIES IN VIEW</span><button className="text-button" onClick={() => { setActiveTab('routes'); setShowPanel(true); }}>FILTER</button></div>
         <div className="territory-list">
-          {visibleClaims.length === 0 && <p className="route-empty-state">No captured territories in the selected routes.</p>}
-          {visibleClaims.map((claim) => <button className="territory-target" key={claim.id} onClick={() => inspectClaim(claim)}>
+          {mapClaims.length === 0 && <p className="route-empty-state">No captured territories in the selected routes.</p>}
+          {mapClaims.map((claim) => <button className="territory-target" key={claim.id} onClick={() => inspectClaim(claim)}>
             <span className="territory-swatch" style={{ background: claim.color }}><Flag size={17} /></span>
             <span><strong>{claim.name}</strong><small>{claim.username === runnerName ? 'Yours' : claim.username} · Strength {claim.strength} · {claim.areaSqKm.toFixed(3)} km²</small></span>
             <ArrowUpRight size={16} />

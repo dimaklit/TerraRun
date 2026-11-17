@@ -1,0 +1,37 @@
+export const rivalColor = '#ff5e7d';
+
+export function rivalFromFeedRow(row) {
+  return {
+    id: `rival-${row.id}`,
+    routeId: `rival-${row.id}`,
+    activityKey: `rival-${row.id}`,
+    username: `rival:${row.owner_token}`,
+    name: 'Rival territory',
+    color: rivalColor,
+    recordedAt: Date.parse(row.recorded_at),
+    polygon: row.claim.polygon,
+    areaSqKm: row.claim.areaSqKm ?? 0,
+  };
+}
+
+export async function loadRivalClaims(client) {
+  const { data, error } = await client.from('shared_claims_feed')
+    .select('id, owner_token, mine, claim, recorded_at')
+    .eq('mine', false)
+    .order('recorded_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(rivalFromFeedRow);
+}
+
+// Publishes only the claim polygon and area: no name, email or route details.
+export async function publishClaims(client, claims) {
+  const rows = claims.filter((claim) => claim.polygon).map((claim) => ({
+    claim_key: claim.activityKey,
+    claim: { polygon: claim.polygon, areaSqKm: claim.areaSqKm },
+    recorded_at: new Date(claim.recordedAt).toISOString(),
+  }));
+  if (!rows.length) return;
+  const { error } = await client.from('shared_claims').insert(rows);
+  // 23505 = unique violation: the claim was already published earlier.
+  if (error && error.code !== '23505') throw error;
+}

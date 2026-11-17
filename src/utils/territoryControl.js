@@ -45,13 +45,15 @@ export function calculateTerritoryControl(activities) {
   }, []);
 }
 
+const isRival = (username) => Boolean(username?.startsWith('rival:'));
+
 export function selectControlledTerritories(territories, visibleRoutes, activities) {
   const ids = new Set(visibleRoutes.map((route) => route.id));
   const polygons = activities.filter((activity) => ids.has(activity.routeId) && activity.polygon).map((activity) => activity.polygon);
   if (!polygons.length) return [];
   const visibleGeometry = polygons.length === 1 ? polygons[0] : union(featureCollection(polygons));
   return territories.flatMap((territory, index) => {
-    if (!territory.properties.username || territory.properties.strength <= 0) return [];
+    if (!territory.properties.username || territory.properties.strength <= 0 || isRival(territory.properties.username)) return [];
     const polygon = intersect(featureCollection([territory, visibleGeometry]));
     if (!polygon) return [];
     return [{
@@ -60,6 +62,21 @@ export function selectControlledTerritories(territories, visibleRoutes, activiti
       routeId: territory.properties.routeIds.find((id) => ids.has(id)),
       areaSqKm: area(polygon) / 1_000_000,
       polygon,
+    }];
+  });
+}
+
+export function selectRivalTerritories(territories) {
+  return territories.flatMap((territory, index) => {
+    if (!isRival(territory.properties.username) || territory.properties.strength <= 0) return [];
+    return [{
+      ...territory.properties,
+      id: `rival-territory-${index}`,
+      name: 'Rival territory',
+      username: 'Anonymous rival',
+      routeId: null,
+      areaSqKm: area(territory) / 1_000_000,
+      polygon: territory,
     }];
   });
 }

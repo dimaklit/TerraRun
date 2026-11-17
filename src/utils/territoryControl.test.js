@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { area, polygon } from '@turf/turf';
-import { applyTerritoryActivity, calculateTerritoryControl, getControlledAreaSqKm, selectControlledTerritories } from './territoryControl.js';
+import { applyTerritoryActivity, calculateTerritoryControl, getControlledAreaSqKm, selectControlledTerritories, selectRivalTerritories } from './territoryControl.js';
 
 const rectangle = (west, south, east, north) => polygon([[[west,south],[east,south],[east,north],[west,north],[west,south]]]);
 const outer = rectangle(0, 0, 4, 4);
@@ -52,6 +52,27 @@ test('activity history is chronological, duplicate imports and flagged runs add 
   assert.equal(state[0].properties.username, 'Mila');
   const deduplicated = calculateTerritoryControl([{...first,activityKey:'same'}, {...first,routeId:'copy',activityKey:'same'}]);
   assert.equal(deduplicated[0].properties.strength, 1);
+});
+
+test('rival claims weaken owned areas and render anonymously outside route selection', () => {
+  const state = calculateTerritoryControl([
+    activity('a', 'Mila', outer),
+    { ...activity('r1', 'rival:abc123', inner, 1), name: 'Rival territory' },
+    { ...activity('r2', 'rival:abc123', inner, 2), name: 'Rival territory' },
+    { ...activity('r3', 'rival:def456', rectangle(5, 5, 6, 6), 3), name: 'Rival territory' },
+  ]);
+  const rivals = selectRivalTerritories(state);
+  assert.equal(rivals.length, 2);
+  for (const rival of rivals) {
+    assert.equal(rival.username, 'Anonymous rival');
+    assert.equal(rival.name, 'Rival territory');
+    assert.ok(rival.areaSqKm > 0);
+  }
+  // the inner overlap flipped to the rival, so Mila keeps only the ring
+  assert.ok(Math.abs(getControlledAreaSqKm(state, 'Mila') - (area(outer) - area(inner)) / 1_000_000) < 0.000001);
+  // my own view never includes rival-owned regions
+  const visible = selectControlledTerritories(state, [{ id: 'a' }], [activity('a', 'Mila', outer)]);
+  assert.ok(visible.every((claim) => claim.username === 'Mila'));
 });
 
 test('map selection does not replay or undo attacks and neutral land is not painted', () => {
