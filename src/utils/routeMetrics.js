@@ -65,18 +65,40 @@ export function calculateSharedAreaSqKm(polygons) {
   return shared ? area(shared) / 1_000_000 : 0;
 }
 
-function getMaxSpeedKmh(coordinates, times) {
-  if (times.length !== coordinates.length) return null;
-  let maxSpeed = 0;
+function getSpeedProfile(coordinates, times) {
+  if (times.length !== coordinates.length) return [];
+  const segments = [];
 
   for (let index = 1; index < coordinates.length; index += 1) {
     const elapsedHours = (times[index] - times[index - 1]) / 3_600_000;
     if (!Number.isFinite(elapsedHours) || elapsedHours <= 0) continue;
-    const speed = distance(coordinates[index - 1], coordinates[index]) / elapsedHours;
-    maxSpeed = Math.max(maxSpeed, speed);
+    segments.push({
+      kmh: distance(coordinates[index - 1], coordinates[index]) / elapsedHours,
+      seconds: elapsedHours * 3600,
+    });
   }
 
-  return maxSpeed || null;
+  // Median-of-three smoothing suppresses isolated GPS spikes.
+  return segments.map((segment, index) => {
+    const window = [segments[index - 1]?.kmh, segment.kmh, segments[index + 1]?.kmh]
+      .filter((value) => value !== undefined)
+      .sort((first, second) => first - second);
+    return { ...segment, smoothedKmh: window[Math.floor(window.length / 2)] };
+  });
+}
+
+const MAX_SPEED_KMH = 35;
+const SUSTAINED_OVERSPEED_SECONDS = 10;
+
+function assessSpeed(coordinates, times) {
+  const profile = getSpeedProfile(coordinates, times);
+  if (!profile.length) return { maxSpeedKmh: null, flagged: false };
+  const maxSpeedKmh = Math.max(...profile.map((segment) => segment.smoothedKmh));
+  const overspeedSeconds = profile.reduce((sum, segment) => segment.smoothedKmh > MAX_SPEED_KMH ? sum + segment.seconds : sum, 0);
+  const totalSeconds = profile.reduce((sum, segment) => sum + segment.seconds, 0);
+  // Flag only sustained speeding: a long stretch over the limit, or most of the route.
+  const flagged = overspeedSeconds > SUSTAINED_OVERSPEED_SECONDS || (totalSeconds > 0 && overspeedSeconds > totalSeconds / 2);
+  return { maxSpeedKmh, flagged };
 }
 
 function getCapturedGeometry(route, isClosed) {
@@ -130,8 +152,7 @@ export function calculateRouteMetrics(coordinates, times = []) {
   const last = coordinates[coordinates.length - 1];
   const closingDistanceKm = distance(first, last);
   const isClosed = closingDistanceKm <= 0.05;
-  const maxSpeedKmh = getMaxSpeedKmh(coordinates, times);
-  const flagged = maxSpeedKmh !== null && maxSpeedKmh > 35;
+  const { maxSpeedKmh, flagged } = assessSpeed(coordinates, times);
   const capturedGeometry = flagged
     ? { polygon: null, areaSqKm: 0 }
     : getCapturedGeometry(lineString(coordinates), isClosed);

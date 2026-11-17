@@ -102,7 +102,33 @@ test('closes a route whose finish is within the 50 meter tolerance', () => {
   assert.ok(metrics.areaSqKm > 0);
 });
 
-test('withholds area for a speed-flagged route', () => {
+test('withholds area for a sustained speed-flagged route', () => {
+  // 20 segments of 2 seconds each at ~50 km/h — a vehicle, not a GPS glitch
+  const coordinates = Array.from({ length: 21 }, (unused, index) => [index * 0.00025, 0]);
+  const times = coordinates.map((unused, index) => index * 2000);
+  const metrics = calculateRouteMetrics(coordinates, times);
+
+  assert.equal(metrics.flagged, true);
+  assert.equal(metrics.polygon, null);
+  assert.equal(metrics.areaSqKm, 0);
+});
+
+test('tolerates an isolated GPS spike inside a normal run', () => {
+  // closed loop at ~9 km/h with one point jumping ~100 m away for a second
+  const base = [
+    [0, 0], [0.0005, 0], [0.001, 0], [0.001, 0.0005], [0.001, 0.001],
+    [0.0005, 0.001], [0, 0.001], [0, 0.0005], [0, 0],
+  ];
+  const coordinates = [...base.slice(0, 4), [0.002, 0.0005], ...base.slice(4)];
+  const times = coordinates.map((unused, index) => index * 20_000);
+  const metrics = calculateRouteMetrics(coordinates, times);
+
+  assert.equal(metrics.flagged, false);
+  assert.ok(metrics.maxSpeedKmh < 35);
+  assert.ok(metrics.areaSqKm > 0);
+});
+
+test('flags a short burst where most of the route is over the limit', () => {
   const metrics = calculateRouteMetrics(
     [[0, 0], [0.001, 0], [0, 0]],
     [0, 1, 2],
