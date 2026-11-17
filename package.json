@@ -10,6 +10,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@mapbox/mapbox-gl-rtl-text": "^0.2.3",
     "@neon/neon-js": "^0.10.2",
     "@tmcw/togeojson": "^7.1.2",
     "@turf/turf": "^7.2.0",

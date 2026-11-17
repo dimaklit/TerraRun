@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
+import rtlTextPluginUrl from '@mapbox/mapbox-gl-rtl-text/mapbox-gl-rtl-text.min.js?url';
 import {
   Activity,
   ArrowUpRight,
@@ -41,6 +42,9 @@ import { filterRoutes, getRouteColor, routePeriods } from './utils/routeFilters.
 
 const dayMs = 24 * 60 * 60 * 1000;
 const demoRecordedAt = Date.now();
+
+// Renders Hebrew and Arabic labels right-to-left; loads lazily when RTL text appears.
+maplibregl.setRTLTextPlugin(rtlTextPluginUrl, true);
 
 const demoClaims = [
   {
