@@ -1,7 +1,11 @@
 import { marked } from 'marked';
 import { readFileSync, writeFileSync } from 'fs';
 
-const md = readFileSync('docs/ENGINEERING.md', 'utf8');
+// Usage: node make-pdf.mjs [input.md] [output.html] [cover subtitle]
+const [,, input = 'docs/ENGINEERING.md', output = 'docs/.engineering-print.html',
+  subtitle = 'Engineering Document — Architecture, Logic &amp; Interfaces'] = process.argv;
+
+const md = readFileSync(input, 'utf8');
 
 // Pull mermaid blocks out so marked never touches them.
 const mermaidBlocks = [];
@@ -18,7 +22,7 @@ const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>TerraRun — Engineering Document</title>
+<title>TerraRun — ${subtitle.replace(/&amp;/g, '&')}</title>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <style>
   @page { size: A4; margin: 18mm 16mm; }
@@ -50,12 +54,11 @@ const html = `<!doctype html>
 <body>
 <div class="cover">
   <h1>TerraRun</h1>
-  <div class="sub">Engineering Document — Architecture, Logic &amp; Interfaces</div>
+  <div class="sub">${subtitle}</div>
   <div class="sub" style="margin-top:6mm">Territory-control game for runners</div>
   <div class="meta">
     Version 0.2.0 · ${new Date().toISOString().slice(0, 10)}<br/>
-    https://dimaklit.github.io/TerraRun/ · github.com/dimaklit/TerraRun<br/><br/>
-    Prepared for engineering review
+    https://dimaklit.github.io/TerraRun/ · github.com/dimaklit/TerraRun
   </div>
 </div>
 ${body}
@@ -65,5 +68,5 @@ ${body}
 </body>
 </html>`;
 
-writeFileSync('docs/.engineering-print.html', html);
+writeFileSync(output, html);
 console.log('html written');
