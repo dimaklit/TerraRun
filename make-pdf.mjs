@@ -3,14 +3,16 @@ import { readFileSync, writeFileSync } from 'fs';
 
 const md = readFileSync('docs/ENGINEERING.md', 'utf8');
 
-// Pull mermaid blocks out so marked doesn't escape them.
+// Pull mermaid blocks out so marked never touches them.
 const mermaidBlocks = [];
 const mdPrepared = md.replace(/```mermaid\r?\n([\s\S]*?)```/g, (unused, code) => {
   mermaidBlocks.push(code);
-  return `<div class="mermaid">${code}</div>`;
+  return `MERMAIDPLACEHOLDER${mermaidBlocks.length - 1}`;
 });
 
-const body = marked.parse(mdPrepared, { mangle: false, headerIds: false });
+let body = marked.parse(mdPrepared, { mangle: false, headerIds: false });
+body = body.replace(/(?:<p>)?MERMAIDPLACEHOLDER(\d+)(?:<\/p>)?/g, (unused, index) =>
+  `<div class="mermaid">${mermaidBlocks[Number(index)]}</div>`);
 
 const html = `<!doctype html>
 <html lang="en">
