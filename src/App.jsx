@@ -528,6 +528,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         <a className="brand" href="#home" aria-label="TerraRun home">
           <span className="brand-mark"><Footprints size={22} /></span>
           <span className="brand-name">TerraRun</span>
+          <span className="brand-tag">v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}</span>
         </a>
         <div className="mode-switch" role="tablist" aria-label="Map mode">
           <button className={activeTab === 'territory' ? 'mode-active' : ''} onClick={() => setActiveTab('territory')} role="tab" aria-selected={activeTab === 'territory'}>
