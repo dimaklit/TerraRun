@@ -134,3 +134,7 @@ h1 { margin: 12px 0 0; font: 600 25px 'Space Grotesk', sans-serif; }
   .activity-strip { left: 12px; right: 12px; bottom: 14px; min-height: 88px; padding: 9px 10px; display: block; }.strip-title { width: auto; gap: 7px; height: 23px; }.strip-marker { width: 22px; height: 22px; }.strip-title strong { margin-top: 2px; font-size: 9px; }.strip-title .eyebrow { font-size: 7px; }.activity-items { margin-top: 5px; height: 38px; overflow-x: auto; }.activity-item { gap: 6px; padding: 3px 6px; min-width: 120px; }.activity-copy strong { font-size: 8px; }.activity-copy small { font-size: 7px; }.activity-distance strong { font-size: 7px; }.activity-distance small { font-size: 6px; }.activity-line { height: 21px; }.strip-more { position: absolute; right: 10px; top: 8px; width: 23px; height: 23px; }
   .territory-detail { top: 195px; right: 12px; width: min(300px, calc(100% - 24px)); max-height: calc(100% - 230px); overflow-y: auto; padding: 20px; }.territory-detail h2 { font-size: 21px; }.toast { top: 195px; font-size: 10px; padding: 10px; }.map-status { display: none; }.reopen-panel { top: auto; bottom: 116px; left: 12px; }
 }
+/* Hide the built-in geolocate button: triggered by our own locate button instead. */
+.maplibregl-ctrl-group:has(> .maplibregl-ctrl-geolocate) {
+  display: none;
+}

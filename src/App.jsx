@@ -182,6 +182,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const showTowersRef = useRef(showTowers);
   const importing = useRef(false);
   const fittedToOwnRoutes = useRef(false);
+  const geolocateRef = useRef(null);
   activeTabRef.current = activeTab;
   showTowersRef.current = showTowers;
 
@@ -310,6 +311,17 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     });
     mapRef.current = map;
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+    // Hidden geolocate control: draws the pulsing location dot; triggered by our own button.
+    const geolocate = new maplibregl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+      showUserLocation: true,
+      showAccuracyCircle: true,
+      fitBoundsOptions: { maxZoom: 15.5 },
+    });
+    map.addControl(geolocate, 'bottom-right');
+    geolocate.on('error', () => setNotice('Location unavailable — check browser permissions.'));
+    geolocateRef.current = geolocate;
 
     function installGameLayers() {
       map.addSource('claims', { type: 'geojson', data: claimCollection(claimsRef.current) });
@@ -490,23 +502,11 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     }
   }
 
-  // Centers the map on the player's GPS position; falls back to their routes.
+  // Centers the map on the player's GPS position and shows the location dot.
   function locateMe() {
-    if (!navigator.geolocation) {
-      setNotice('Geolocation is not supported by this browser.');
-      focusMap();
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        mapRef.current?.flyTo({ center: [position.coords.longitude, position.coords.latitude], zoom: 15.5, duration: 900 });
-      },
-      () => {
-        setNotice('Location unavailable — showing your routes instead.');
-        focusMap();
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
-    );
+    if (geolocateRef.current?.trigger()) return;
+    setNotice('Geolocation is not supported by this browser.');
+    focusMap();
   }
 
   function inspectClaim(claim) {
