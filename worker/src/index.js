@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import FitParser from 'fit-file-parser';
 import { createPkcePair, openState, sealState } from './state.js';
 import { recordsToFeature } from './fit.js';
+import { notifyNewUsers, sendDailyStats } from './admin.js';
 
 const GARMIN_AUTHORIZE_URL = 'https://connect.garmin.com/oauth2Confirm';
 const GARMIN_TOKEN_URL = 'https://diauth.garmin.com/di-oauth2-service/oauth/token';
@@ -153,6 +154,15 @@ async function handleDeregistration(env, request, pathname) {
 }
 
 export default {
+  async scheduled(event, env, ctx) {
+    try {
+      if (event.cron === '0 4 * * *') await sendDailyStats(env);
+      else await notifyNewUsers(env);
+    } catch (error) {
+      console.error('Scheduled task failed', error);
+    }
+  },
+
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(env, request) });

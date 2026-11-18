@@ -8,6 +8,7 @@ export default function AuthGate() {
   const [loading, setLoading] = useState(Boolean(neonClient));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [nickname, setNickname] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +36,7 @@ export default function AuthGate() {
     try {
       const cleanEmail = email.trim().toLowerCase();
       const result = isSignUp
-        ? await neonClient.auth.signUp.email({ name: cleanEmail.split('@')[0] || 'Runner', email: cleanEmail, password })
+        ? await neonClient.auth.signUp.email({ name: nickname.trim() || cleanEmail.split('@')[0] || 'Runner', email: cleanEmail, password })
         : await neonClient.auth.signIn.email({ email: cleanEmail, password });
       if (result.error) throw new Error(result.error.message);
       const sessionResult = await neonClient.auth.getSession();
@@ -65,6 +66,10 @@ export default function AuthGate() {
       <h1 id="auth-title">Sign in to your account</h1>
       <p>Access your private routes and territory preview.</p>
       <form onSubmit={submitAuth}>
+        {isSignUp && <>
+          <label htmlFor="auth-nickname">Nickname</label>
+          <input id="auth-nickname" type="text" autoComplete="nickname" maxLength={32} placeholder="How other runners will see you" value={nickname} onChange={(event) => setNickname(event.target.value)} />
+        </>}
         <label htmlFor="auth-email">Email address</label>
         <input id="auth-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
         <label htmlFor="auth-password">Password</label>

@@ -192,16 +192,17 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     setStorageError('');
     loadPrivateActivities(client, user.id).then((activities) => {
       if (!active) return;
+      const displayName = user.name?.trim() || user.email || 'You';
       const routesForUser = activities.map(({ route, activity_key: activityKey, recorded_at: recordedAt }) => ({
         ...route,
-        username: user.email ?? 'You',
+        username: displayName,
         activityKey,
         recordedAt: Date.parse(recordedAt),
       }));
       const claimsForUser = activities.flatMap(({ claim, route, activity_key: activityKey, recorded_at: recordedAt }) => claim ? [{
         ...claim,
         routeId: route.id,
-        username: user.email ?? 'You',
+        username: displayName,
         activityKey,
         recordedAt: Date.parse(recordedAt),
       }] : []);
@@ -267,7 +268,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
 
   const controlledTerritories = useMemo(() => calculateTerritoryControl([...claims, ...rivalClaims]), [claims, rivalClaims]);
   const totalArea = useMemo(() => getControlledAreaSqKm(controlledTerritories, user ? user.email : undefined), [controlledTerritories, user]);
-  const runnerName = user?.email ?? currentRunner;
+  const runnerName = user ? (user.name?.trim() || user.email) : currentRunner;
   const runnerKey = user?.id ?? currentRunner;
   const selectedRouteIds = routeSelections[runnerKey] ?? new Set(routes.map((route) => route.id));
   const updateRouteSelection = (update) => setRouteSelections((current) => {
@@ -408,7 +409,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
       for (const { file, routes: parsedRoutes } of parsedFiles) {
         const baseName = file.name.replace(/\.(gpx|geojson|json)$/i, '');
         for (const [partIndex, parsed] of parsedRoutes.entries()) {
-          const activityKey = `${runnerName}:${parsed.activityKey}`;
+          // Key by email (stable) so renaming the nickname never breaks deduplication.
+          const activityKey = `${user?.email ?? runnerName}:${parsed.activityKey}`;
           if (importedActivityKeys.current.has(activityKey) || batchKeys.has(activityKey)) {
             duplicateCount += 1;
             continue;
@@ -486,6 +488,25 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
       const bounds = coordinates.reduce((result, point) => result.extend(point), new maplibregl.LngLatBounds(coordinates[0], coordinates[0]));
       mapRef.current?.fitBounds(bounds, { padding: window.innerWidth <= 760 ? 50 : 100, maxZoom: 15, duration: 700 });
     }
+  }
+
+  // Centers the map on the player's GPS position; falls back to their routes.
+  function locateMe() {
+    if (!navigator.geolocation) {
+      setNotice('Geolocation is not supported by this browser.');
+      focusMap();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        mapRef.current?.flyTo({ center: [position.coords.longitude, position.coords.latitude], zoom: 15.5, duration: 900 });
+      },
+      () => {
+        setNotice('Location unavailable — showing your routes instead.');
+        focusMap();
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
+    );
   }
 
   function inspectClaim(claim) {
@@ -641,7 +662,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
       <div className="map-tools">
         <button className="icon-button" title="Zoom in" aria-label="Zoom in" onClick={() => mapRef.current?.zoomIn()}><ZoomIn size={18} /></button>
         <button className="icon-button" title="Zoom out" aria-label="Zoom out" onClick={() => mapRef.current?.zoomOut()}><ZoomOut size={18} /></button>
-        <button className="icon-button" title="Recenter map" onClick={focusMap}><LocateFixed size={18} /></button>
+        <button className="icon-button" title="Go to my location" aria-label="Go to my location" onClick={locateMe}><LocateFixed size={18} /></button>
         <button className="icon-button" title={activeTab === 'territory' ? 'Show route layers' : 'Show territory layers'} onClick={() => setActiveTab(activeTab === 'territory' ? 'routes' : 'territory')}><Compass size={18} /></button>
         <button className={`icon-button${showTowers ? ' tower-toggle-active' : ''}`} title={showTowers ? 'Hide 3D towers' : 'Show 3D towers'} aria-label="Toggle 3D towers" aria-pressed={showTowers} onClick={() => setShowTowers((visible) => !visible)}><Building2 size={18} /></button>
         <div className="style-switcher">
