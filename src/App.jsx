@@ -528,7 +528,6 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         <a className="brand" href="#home" aria-label="TerraRun home">
           <span className="brand-mark"><Footprints size={22} /></span>
           <span className="brand-name">TerraRun</span>
-          <span className="brand-tag">LOCAL DEMO</span>
         </a>
         <div className="mode-switch" role="tablist" aria-label="Map mode">
           <button className={activeTab === 'territory' ? 'mode-active' : ''} onClick={() => setActiveTab('territory')} role="tab" aria-selected={activeTab === 'territory'}>
@@ -644,7 +643,6 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         <div className="district-footer"><Trophy size={14} /><span>{user ? 'Private captured area' : 'Captured area totals'}</span><strong>{totalArea.toFixed(3)} km²</strong></div>
       </section>)}
 
-      <div className="district-label"><span className="status-indicator" /> MANHATTAN <span>/</span> MIDTOWN</div>
       {inspectedClaim && <aside className="territory-detail" role="dialog" aria-label="Territory details">
         <button className="icon-button detail-close" title="Close territory details" onClick={() => setSelectedClaim(null)}><X size={16} /></button>
         <span className="territory-owner"><Flag size={16} color={inspectedClaim.color} /> {inspectedClaim.username === currentRunner ? 'Your territory' : inspectedClaim.username}</span>
