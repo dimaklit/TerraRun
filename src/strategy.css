@@ -111,8 +111,8 @@ h1 { margin: 12px 0 0; font: 600 25px 'Space Grotesk', sans-serif; }
 .tower-toggle-active { border-color: #a1be88; background: #eaf3da; }
 .style-switcher { position: relative; }.style-menu { top: 0; right: 44px; min-width: 120px; }
 .route-dock { position: absolute; z-index: 5; right: 84px; bottom: 152px; width: 235px; padding: 19px; background: #fbfdf9; border: 1px solid var(--line); border-radius: 5px; box-shadow: 0 6px 24px rgba(30, 46, 32, .12); }
-.dock-drag-handle { cursor: grab; touch-action: none; user-select: none; }
-.dock-drag-handle:active { cursor: grabbing; }
+.drag-handle { cursor: grab; touch-action: none; user-select: none; }
+.drag-handle:active { cursor: grabbing; }
 .dock-topline { display: flex; align-items: center; justify-content: space-between; font-size: 8px; font-weight: 700; color: #7b906c; }.dock-topline > span { display: flex; align-items: center; gap: 5px; }
 .dock-topline-actions { gap: 8px; }
 .dock-close { width: 22px; height: 22px; }

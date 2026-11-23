@@ -109,12 +109,12 @@ const routeCollection = (routes) => ({
   })),
 });
 
-function RouteSelectionPanel({ runnerName, routesInPeriod, selectedRouteIds, period, onPeriodChange, onToggleRoute, onSelectAll, onClear, onClose }) {
+function RouteSelectionPanel({ runnerName, routesInPeriod, selectedRouteIds, period, onPeriodChange, onToggleRoute, onSelectAll, onClear, onClose, floatStyle, handleProps }) {
   const selectedInPeriod = routesInPeriod.filter((route) => selectedRouteIds.has(route.id)).length;
 
   return (
-    <section className="side-panel route-panel" aria-label="Route selection">
-      <div className="panel-heading route-panel-heading">
+    <section className="side-panel route-panel" aria-label="Route selection" style={floatStyle}>
+      <div className="panel-heading route-panel-heading drag-handle" {...handleProps}>
         <div>
           <p className="eyebrow">MAP FILTER / {runnerName.toUpperCase()}</p>
           <h2>Route selection</h2>
@@ -143,6 +143,39 @@ function RouteSelectionPanel({ runnerName, routesInPeriod, selectedRouteIds, per
       </div>
     </section>
   );
+}
+
+// Makes an absolutely-positioned panel draggable by a handle child.
+// Returns a style for the panel and pointer handlers to spread onto the handle.
+function useFloating({ freezeSize = false } = {}) {
+  const [style, setStyle] = useState(undefined);
+  const drag = useRef(null);
+
+  const handleProps = {
+    onPointerDown(event) {
+      if (event.target.closest('button, select, input, a')) return;
+      const rect = event.currentTarget.parentElement.getBoundingClientRect();
+      drag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, width: rect.width, height: rect.height };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    },
+    onPointerMove(event) {
+      if (!drag.current) return;
+      const { dx, dy, width, height } = drag.current;
+      setStyle({
+        left: Math.min(Math.max(event.clientX - dx, 8), window.innerWidth - 90),
+        top: Math.min(Math.max(event.clientY - dy, 8), window.innerHeight - 48),
+        right: 'auto',
+        bottom: 'auto',
+        // Panels anchored to opposite viewport edges need their size pinned once unanchored.
+        ...(freezeSize ? { width, height, maxHeight: 'none' } : {}),
+      });
+    },
+    onPointerUp() { drag.current = null; },
+    onPointerCancel() { drag.current = null; },
+  };
+
+  return { style, handleProps };
 }
 
 function App({ user = null, client = null, onSignOut, authMessage }) {
@@ -182,9 +215,11 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const [showTowers, setShowTowers] = useState(true);
   const [showRivals, setShowRivals] = useState(true);
   const [showImportDock, setShowImportDock] = useState(true);
-  // Floating import dock: null = default CSS position, otherwise dragged coordinates.
-  const [dockPosition, setDockPosition] = useState(null);
-  const dockDrag = useRef(null);
+  // Every panel is a floating window, draggable by its header.
+  const dockFloat = useFloating();
+  const panelFloat = useFloating({ freezeSize: true });
+  const detailFloat = useFloating();
+  const stripFloat = useFloating({ freezeSize: true });
   const claimsRef = useRef([]);
   const towersRef = useRef(emptyCollection);
   const nextRouteColor = useRef(demoRoutes.length);
@@ -532,25 +567,6 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     focusMap();
   }
 
-  function startDockDrag(event) {
-    if (event.target.closest('button, select, input')) return;
-    const rect = event.currentTarget.parentElement.getBoundingClientRect();
-    dockDrag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function moveDockDrag(event) {
-    if (!dockDrag.current) return;
-    setDockPosition({
-      x: Math.min(Math.max(event.clientX - dockDrag.current.dx, 8), window.innerWidth - 120),
-      y: Math.min(Math.max(event.clientY - dockDrag.current.dy, 8), window.innerHeight - 60),
-    });
-  }
-
-  function endDockDrag() {
-    dockDrag.current = null;
-  }
-
   function inspectClaim(claim) {
     setSelectedClaim(claim.id);
     const route = routes.find((item) => item.id === claim.routeId);
@@ -645,9 +661,11 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
             return next;
           })}
           onClose={() => setShowPanel(false)}
+          floatStyle={panelFloat.style}
+          handleProps={panelFloat.handleProps}
         />
-        : <section className="side-panel" aria-label="Territory overview">
-        <div className="panel-heading">
+        : <section className="side-panel" aria-label="Territory overview" style={panelFloat.style}>
+        <div className="panel-heading drag-handle" {...panelFloat.handleProps}>
           <div>
             <p className="eyebrow"><Flag size={14} /> TACTICAL OVERVIEW</p>
             <h1>District control</h1>
@@ -700,9 +718,9 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         <div className="district-footer"><Trophy size={14} /><span>{user ? 'Private captured area' : 'Captured area totals'}</span><strong>{totalArea.toFixed(3)} km²</strong></div>
       </section>)}
 
-      {inspectedClaim && <aside className="territory-detail" role="dialog" aria-label="Territory details">
+      {inspectedClaim && <aside className="territory-detail" role="dialog" aria-label="Territory details" style={detailFloat.style}>
         <button className="icon-button detail-close" title="Close territory details" onClick={() => setSelectedClaim(null)}><X size={16} /></button>
-        <span className="territory-owner"><Flag size={16} color={inspectedClaim.color} /> {inspectedClaim.username === currentRunner ? 'Your territory' : inspectedClaim.username}</span>
+        <span className="territory-owner drag-handle" {...detailFloat.handleProps}><Flag size={16} color={inspectedClaim.color} /> {inspectedClaim.username === currentRunner ? 'Your territory' : inspectedClaim.username}</span>
         <h2>{inspectedClaim.name}</h2>
         <dl>
           <div><dt>Control strength</dt><dd>{inspectedClaim.strength}</dd></div>
@@ -734,8 +752,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
       </div>
 
       <input ref={fileInput} className="visually-hidden" type="file" multiple disabled={storageState !== 'ready'} accept=".gpx,.json,.geojson,application/gpx+xml,application/geo+json,application/json" onChange={(event) => { handleFiles(event.target.files); event.target.value = ''; }} />
-      {showImportDock ? <aside className="route-dock" style={dockPosition ? { left: dockPosition.x, top: dockPosition.y, right: 'auto', bottom: 'auto' } : undefined}>
-        <div className="dock-topline dock-drag-handle" onPointerDown={startDockDrag} onPointerMove={moveDockDrag} onPointerUp={endDockDrag} onPointerCancel={endDockDrag}>
+      {showImportDock ? <aside className="route-dock" style={dockFloat.style}>
+        <div className="dock-topline drag-handle" {...dockFloat.handleProps}>
           <span><Activity size={14} /> ACTIVITY IMPORT</span>
           <span className="dock-topline-actions">
             <span className="demo-tag">DEMO</span>
@@ -753,8 +771,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         <button className="upload-button" disabled={storageState !== 'ready'} onClick={() => fileInput.current?.click()}><Upload size={16} /> IMPORT ROUTE <Plus size={16} /></button>
       </aside> : <button className="reopen-panel reopen-dock" onClick={() => setShowImportDock(true)}><Upload size={16} /> Activity import</button>}
 
-      <section className="activity-strip" aria-label="Recent routes">
-        <div className="strip-title"><span className="strip-marker"><Activity size={15} /></span><div><span className="eyebrow">SELECTED RUNS</span><strong>On the map</strong></div></div>
+      <section className="activity-strip" aria-label="Recent routes" style={stripFloat.style}>
+        <div className="strip-title drag-handle" {...stripFloat.handleProps}><span className="strip-marker"><Activity size={15} /></span><div><span className="eyebrow">SELECTED RUNS</span><strong>On the map</strong></div></div>
         <div className="activity-items">
           {visibleRoutes.slice(0, 3).map((route) => <button className="activity-item" key={route.id} onClick={() => {
             mapRef.current?.fitBounds(route.coordinates.reduce((bounds, point) => bounds.extend(point), new maplibregl.LngLatBounds(route.coordinates[0], route.coordinates[0])), { padding: 120, maxZoom: 16 });
