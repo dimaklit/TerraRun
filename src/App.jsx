@@ -672,6 +672,19 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
           </div>
           <button className="icon-button panel-close" title="Close overview" aria-label="Close overview" onClick={() => setShowPanel(false)}><X size={17} /></button>
         </div>
+        {user && storageState === 'loading' && <p className="route-empty-state" role="status">Loading private activity totals…</p>}
+        {user && storageState === 'error' && <p className="route-empty-state" role="alert">{storageError} <button className="text-button" onClick={() => setStorageAttempt((attempt) => attempt + 1)}>Retry</button></p>}
+        <div className="rank-heading private-activity-heading"><span className="eyebrow">{user ? 'YOUR PRIVATE ACTIVITY' : 'LOCAL STANDINGS'}</span><button className="text-button" onClick={() => setShowBoard(!showBoard)}>{showBoard ? 'HIDE' : 'SHOW'}</button></div>
+        {showBoard && <div className="leaderboard">
+          {leaderboard.map((runner, index) => <div className={`rank-row${runner.username === currentRunner ? ' rank-self' : ''}`} key={runner.username}>
+            <span className="rank-number">{String(index + 1).padStart(2, '0')}</span>
+            <span className={`rank-avatar${runner.username === currentRunner ? ' self-avatar' : runner.username === 'Jonas Reed' ? ' avatar-salmon' : ' avatar-blue'}`}>{runner.initials}</span>
+            <span className="rank-user">{runner.username}{runner.username === currentRunner && <small>YOU</small>}</span>
+            <strong>{runner.area.toFixed(3)}</strong><span className="rank-unit">km²</span>
+          </div>)}
+        </div>}
+        <div className="district-footer"><Trophy size={14} /><span>{user ? 'Private captured area' : 'Captured area totals'}</span><strong>{totalArea.toFixed(3)} km²</strong></div>
+        <div className="panel-rule" />
         <div className="area-readout">
           <span className="readout-label">YOUR CONTROL</span>
           <div className="readout-value">{myArea.toFixed(3)}<span> km²</span></div>
@@ -703,19 +716,6 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
             <ArrowUpRight size={16} />
           </button>)}
         </div>
-        <div className="panel-rule" />
-        {user && storageState === 'loading' && <p className="route-empty-state" role="status">Loading private activity totals…</p>}
-        {user && storageState === 'error' && <p className="route-empty-state" role="alert">{storageError} <button className="text-button" onClick={() => setStorageAttempt((attempt) => attempt + 1)}>Retry</button></p>}
-        <div className="rank-heading"><span className="eyebrow">{user ? 'YOUR PRIVATE ACTIVITY' : 'LOCAL STANDINGS'}</span><button className="text-button" onClick={() => setShowBoard(!showBoard)}>{showBoard ? 'HIDE' : 'SHOW'}</button></div>
-        {showBoard && <div className="leaderboard">
-          {leaderboard.map((runner, index) => <div className={`rank-row${runner.username === currentRunner ? ' rank-self' : ''}`} key={runner.username}>
-            <span className="rank-number">{String(index + 1).padStart(2, '0')}</span>
-            <span className={`rank-avatar${runner.username === currentRunner ? ' self-avatar' : runner.username === 'Jonas Reed' ? ' avatar-salmon' : ' avatar-blue'}`}>{runner.initials}</span>
-            <span className="rank-user">{runner.username}{runner.username === currentRunner && <small>YOU</small>}</span>
-            <strong>{runner.area.toFixed(3)}</strong><span className="rank-unit">km²</span>
-          </div>)}
-        </div>}
-        <div className="district-footer"><Trophy size={14} /><span>{user ? 'Private captured area' : 'Captured area totals'}</span><strong>{totalArea.toFixed(3)} km²</strong></div>
       </section>)}
 
       {inspectedClaim && <aside className="territory-detail" role="dialog" aria-label="Territory details" style={detailFloat.style}>

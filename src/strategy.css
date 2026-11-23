@@ -63,6 +63,7 @@ h1 { margin: 12px 0 0; font: 600 25px 'Space Grotesk', sans-serif; }
 .metric-row strong small { font: 400 9px Manrope, sans-serif; color: #8b977f; }
 .metric-side { margin-left: auto; font-size: 9px; color: #8b977f; }
 .rank-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.private-activity-heading { margin-top: 18px; }
 .rank-heading .eyebrow { margin-right: auto; }
 .text-button { border: 0; background: transparent; color: var(--accent); font-size: 9px; font-weight: 800; padding: 5px 0; }
 .territory-list { margin-top: 8px; }
