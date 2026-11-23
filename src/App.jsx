@@ -182,6 +182,9 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const [showTowers, setShowTowers] = useState(true);
   const [showRivals, setShowRivals] = useState(true);
   const [showImportDock, setShowImportDock] = useState(true);
+  // Floating import dock: null = default CSS position, otherwise dragged coordinates.
+  const [dockPosition, setDockPosition] = useState(null);
+  const dockDrag = useRef(null);
   const claimsRef = useRef([]);
   const towersRef = useRef(emptyCollection);
   const nextRouteColor = useRef(demoRoutes.length);
@@ -529,6 +532,25 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     focusMap();
   }
 
+  function startDockDrag(event) {
+    if (event.target.closest('button, select, input')) return;
+    const rect = event.currentTarget.parentElement.getBoundingClientRect();
+    dockDrag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveDockDrag(event) {
+    if (!dockDrag.current) return;
+    setDockPosition({
+      x: Math.min(Math.max(event.clientX - dockDrag.current.dx, 8), window.innerWidth - 120),
+      y: Math.min(Math.max(event.clientY - dockDrag.current.dy, 8), window.innerHeight - 60),
+    });
+  }
+
+  function endDockDrag() {
+    dockDrag.current = null;
+  }
+
   function inspectClaim(claim) {
     setSelectedClaim(claim.id);
     const route = routes.find((item) => item.id === claim.routeId);
@@ -712,8 +734,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
       </div>
 
       <input ref={fileInput} className="visually-hidden" type="file" multiple disabled={storageState !== 'ready'} accept=".gpx,.json,.geojson,application/gpx+xml,application/geo+json,application/json" onChange={(event) => { handleFiles(event.target.files); event.target.value = ''; }} />
-      {showImportDock ? <aside className="route-dock">
-        <div className="dock-topline">
+      {showImportDock ? <aside className="route-dock" style={dockPosition ? { left: dockPosition.x, top: dockPosition.y, right: 'auto', bottom: 'auto' } : undefined}>
+        <div className="dock-topline dock-drag-handle" onPointerDown={startDockDrag} onPointerMove={moveDockDrag} onPointerUp={endDockDrag} onPointerCancel={endDockDrag}>
           <span><Activity size={14} /> ACTIVITY IMPORT</span>
           <span className="dock-topline-actions">
             <span className="demo-tag">DEMO</span>

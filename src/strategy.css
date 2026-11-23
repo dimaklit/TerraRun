@@ -110,11 +110,13 @@ h1 { margin: 12px 0 0; font: 600 25px 'Space Grotesk', sans-serif; }
 .map-tools { position: absolute; right: 24px; top: 125px; z-index: 4; display: grid; gap: 6px; }
 .tower-toggle-active { border-color: #a1be88; background: #eaf3da; }
 .style-switcher { position: relative; }.style-menu { top: 0; right: 44px; min-width: 120px; }
-.route-dock { position: absolute; z-index: 2; right: 24px; bottom: 152px; width: 235px; padding: 19px; background: #fbfdf9; border: 1px solid var(--line); border-radius: 5px; }
+.route-dock { position: absolute; z-index: 5; right: 84px; bottom: 152px; width: 235px; padding: 19px; background: #fbfdf9; border: 1px solid var(--line); border-radius: 5px; box-shadow: 0 6px 24px rgba(30, 46, 32, .12); }
+.dock-drag-handle { cursor: grab; touch-action: none; user-select: none; }
+.dock-drag-handle:active { cursor: grabbing; }
 .dock-topline { display: flex; align-items: center; justify-content: space-between; font-size: 8px; font-weight: 700; color: #7b906c; }.dock-topline > span { display: flex; align-items: center; gap: 5px; }
 .dock-topline-actions { gap: 8px; }
 .dock-close { width: 22px; height: 22px; }
-.reopen-dock { left: auto; top: auto; right: 24px; bottom: 152px; }
+.reopen-dock { left: auto; top: auto; right: 84px; bottom: 152px; }
 .demo-tag { font-size: 7px; color: #99a58b; }.route-dock p { margin: 16px 0 12px; font: 600 19px 'Space Grotesk',sans-serif; }
 .dock-meta { display: flex; justify-content: space-between; margin-bottom: 14px; color: #98a68a; font-size: 8px; }
 .activity-strip { position: absolute; z-index: 2; left: 24px; right: 24px; bottom: 38px; min-height: 80px; display: flex; align-items: center; gap: 20px; padding: 15px 18px; background: #fbfdf9; border: 1px solid var(--line); border-radius: 5px; }
