@@ -21,6 +21,7 @@ import {
   ShieldAlert,
   Trophy,
   Upload,
+  Users,
   X,
   ZoomIn,
   ZoomOut,
@@ -179,6 +180,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const [mapStyle, setMapStyle] = useState('positron');
   const [showStyleMenu, setShowStyleMenu] = useState(false);
   const [showTowers, setShowTowers] = useState(true);
+  const [showRivals, setShowRivals] = useState(true);
   const claimsRef = useRef([]);
   const towersRef = useRef(emptyCollection);
   const nextRouteColor = useRef(demoRoutes.length);
@@ -295,7 +297,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const visibleRoutes = useMemo(() => filterRoutes(typedRoutes, selectedRouteIds, routePeriod), [typedRoutes, selectedRouteIds, routePeriod]);
   const visibleClaims = useMemo(() => selectControlledTerritories(typedTerritories, visibleRoutes, claims), [typedTerritories, visibleRoutes, claims]);
   const rivalTerritories = useMemo(() => selectRivalTerritories(typedTerritories), [typedTerritories]);
-  const mapClaims = useMemo(() => [...visibleClaims, ...rivalTerritories], [visibleClaims, rivalTerritories]);
+  const mapClaims = useMemo(() => [...visibleClaims, ...(showRivals ? rivalTerritories : [])], [visibleClaims, rivalTerritories, showRivals]);
   const territoryTowers = useMemo(() => claimCollection(mapClaims), [mapClaims]);
   towersRef.current = territoryTowers;
   const sharedAreaSqKm = useMemo(() => calculateSharedAreaSqKm(
@@ -529,8 +531,14 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   function inspectClaim(claim) {
     setSelectedClaim(claim.id);
     const route = routes.find((item) => item.id === claim.routeId);
-    if (!route) return;
-    const bounds = route.coordinates.reduce((result, point) => result.extend(point), new maplibregl.LngLatBounds(route.coordinates[0], route.coordinates[0]));
+    // Rival territories have no local route: zoom to the territory polygon instead.
+    const geometry = claim.polygon?.geometry;
+    const coordinates = route?.coordinates
+      ?? (geometry?.type === 'Polygon' ? geometry.coordinates.flat()
+        : geometry?.type === 'MultiPolygon' ? geometry.coordinates.flat(2)
+          : null);
+    if (!coordinates?.length) return;
+    const bounds = coordinates.reduce((result, point) => result.extend(point), new maplibregl.LngLatBounds(coordinates[0], coordinates[0]));
     mapRef.current?.fitBounds(bounds, { padding: window.innerWidth <= 760 ? 50 : 130, maxZoom: 15.5, duration: 600 });
   }
 
@@ -645,7 +653,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
           <div><span className="metric-label">SHARED AREA</span><strong>{sharedAreaSqKm.toFixed(3)} <small>km²</small></strong></div>
         </div>
         <div className="panel-rule" />
-        <div className="rank-heading"><span className="eyebrow">TERRITORIES IN VIEW</span><button className="text-button" onClick={() => { setActiveTab('routes'); setShowPanel(true); }}>FILTER</button></div>
+        <div className="rank-heading"><span className="eyebrow">TERRITORIES IN VIEW</span><button className="text-button" aria-pressed={showRivals} onClick={() => setShowRivals((visible) => !visible)}>{showRivals ? 'HIDE RIVALS' : 'SHOW RIVALS'}</button><button className="text-button" onClick={() => { setActiveTab('routes'); setShowPanel(true); }}>FILTER</button></div>
         <div className="territory-list">
           {mapClaims.length === 0 && <p className="route-empty-state">No captured territories in the selected routes.</p>}
           {mapClaims.map((claim) => <button className="territory-target" key={claim.id} onClick={() => inspectClaim(claim)}>
@@ -654,7 +662,6 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
             <ArrowUpRight size={16} />
           </button>)}
         </div>
-        <button className="upload-button territory-import" disabled={storageState !== 'ready'} onClick={() => fileInput.current?.click()}><Footprints size={17} /> IMPORT A RUN <Upload size={16} /></button>
         <div className="panel-rule" />
         {user && storageState === 'loading' && <p className="route-empty-state" role="status">Loading private activity totals…</p>}
         {user && storageState === 'error' && <p className="route-empty-state" role="alert">{storageError} <button className="text-button" onClick={() => setStorageAttempt((attempt) => attempt + 1)}>Retry</button></p>}
@@ -690,6 +697,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         <button className="icon-button" title="Go to my location" aria-label="Go to my location" onClick={locateMe}><LocateFixed size={18} /></button>
         <button className="icon-button" title={activeTab === 'territory' ? 'Show route layers' : 'Show territory layers'} onClick={() => setActiveTab(activeTab === 'territory' ? 'routes' : 'territory')}><Compass size={18} /></button>
         <button className={`icon-button${showTowers ? ' tower-toggle-active' : ''}`} title={showTowers ? 'Hide 3D towers' : 'Show 3D towers'} aria-label="Toggle 3D towers" aria-pressed={showTowers} onClick={() => setShowTowers((visible) => !visible)}><Building2 size={18} /></button>
+        <button className={`icon-button${showRivals ? ' tower-toggle-active' : ''}`} title={showRivals ? 'Hide rival territories' : 'Show rival territories'} aria-label="Toggle rival territories" aria-pressed={showRivals} onClick={() => setShowRivals((visible) => !visible)}><Users size={18} /></button>
         <div className="style-switcher">
           <button className="icon-button" title="Change map style" aria-label="Change map style" aria-expanded={showStyleMenu} onClick={() => setShowStyleMenu(!showStyleMenu)}><Layers size={18} /></button>
           {showStyleMenu && <div className="style-menu" role="group" aria-label="Map style">
