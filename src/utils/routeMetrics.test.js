@@ -113,6 +113,21 @@ test('withholds area for a sustained speed-flagged route', () => {
   assert.equal(metrics.areaSqKm, 0);
 });
 
+test('the anti-cheat speed ceiling depends on the activity type', () => {
+  // ~50 km/h sustained: cheating on foot, a normal bike ride
+  const fast = Array.from({ length: 21 }, (unused, index) => [index * 0.00025, 0]);
+  const fastTimes = fast.map((unused, index) => index * 2000);
+  assert.equal(calculateRouteMetrics(fast, fastTimes, 'run').flagged, true);
+  assert.equal(calculateRouteMetrics(fast, fastTimes, 'bike').flagged, false);
+
+  // ~20 km/h sustained: a fine run, impossible sustained hiking pace
+  const brisk = Array.from({ length: 21 }, (unused, index) => [index * 0.0001, 0]);
+  const briskTimes = brisk.map((unused, index) => index * 2000);
+  assert.equal(calculateRouteMetrics(brisk, briskTimes, 'run').flagged, false);
+  assert.equal(calculateRouteMetrics(brisk, briskTimes, 'hike').flagged, true);
+  assert.equal(calculateRouteMetrics(brisk, briskTimes, 'hike').activityType, 'hike');
+});
+
 test('tolerates an isolated GPS spike inside a normal run', () => {
   // closed loop at ~9 km/h with one point jumping ~100 m away for a second
   const base = [

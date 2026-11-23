@@ -13,6 +13,7 @@ import {
   simplify,
   union,
 } from '@turf/turf';
+import { DEFAULT_ACTIVITY_TYPE, speedLimitKmh } from './activityTypes.js';
 
 export function buildTerritoryTowers(features) {
   let regions = [];
@@ -87,18 +88,17 @@ function getSpeedProfile(coordinates, times) {
   });
 }
 
-const MAX_SPEED_KMH = 35;
 const SUSTAINED_OVERSPEED_SECONDS = 10;
 
-function assessSpeed(coordinates, times) {
+function assessSpeed(coordinates, times, maxSpeedKmh) {
   const profile = getSpeedProfile(coordinates, times);
   if (!profile.length) return { maxSpeedKmh: null, flagged: false };
-  const maxSpeedKmh = Math.max(...profile.map((segment) => segment.smoothedKmh));
-  const overspeedSeconds = profile.reduce((sum, segment) => segment.smoothedKmh > MAX_SPEED_KMH ? sum + segment.seconds : sum, 0);
+  const topSpeedKmh = Math.max(...profile.map((segment) => segment.smoothedKmh));
+  const overspeedSeconds = profile.reduce((sum, segment) => segment.smoothedKmh > maxSpeedKmh ? sum + segment.seconds : sum, 0);
   const totalSeconds = profile.reduce((sum, segment) => sum + segment.seconds, 0);
   // Flag only sustained speeding: a long stretch over the limit, or most of the route.
   const flagged = overspeedSeconds > SUSTAINED_OVERSPEED_SECONDS || (totalSeconds > 0 && overspeedSeconds > totalSeconds / 2);
-  return { maxSpeedKmh, flagged };
+  return { maxSpeedKmh: topSpeedKmh, flagged };
 }
 
 function getCapturedGeometry(route, isClosed) {
@@ -147,12 +147,13 @@ function getCapturedGeometry(route, isClosed) {
   };
 }
 
-export function calculateRouteMetrics(coordinates, times = []) {
+export function calculateRouteMetrics(coordinates, times = [], activityType = DEFAULT_ACTIVITY_TYPE) {
   const first = coordinates[0];
   const last = coordinates[coordinates.length - 1];
   const closingDistanceKm = distance(first, last);
   const isClosed = closingDistanceKm <= 0.05;
-  const { maxSpeedKmh, flagged } = assessSpeed(coordinates, times);
+  // Each activity type has its own anti-cheat speed ceiling.
+  const { maxSpeedKmh, flagged } = assessSpeed(coordinates, times, speedLimitKmh(activityType));
   const capturedGeometry = flagged
     ? { polygon: null, areaSqKm: 0 }
     : getCapturedGeometry(lineString(coordinates), isClosed);
@@ -165,5 +166,6 @@ export function calculateRouteMetrics(coordinates, times = []) {
     isClosed,
     flagged,
     maxSpeedKmh,
+    activityType,
   };
 }

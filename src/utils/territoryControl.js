@@ -45,6 +45,16 @@ export function calculateTerritoryControl(activities) {
   }, []);
 }
 
+// Every activity type is a separate territory world: bike claims never contest run turf.
+export function calculateTerritoryControlByType(activities, defaultType = 'run') {
+  const typeOf = (activity) => activity.activityType ?? defaultType;
+  const types = [...new Set(activities.map(typeOf))];
+  return types.flatMap((type) => (
+    calculateTerritoryControl(activities.filter((activity) => typeOf(activity) === type))
+      .map((territory) => ({ ...territory, properties: { ...territory.properties, activityType: type } }))
+  ));
+}
+
 const isRival = (username) => Boolean(username?.startsWith('rival:'));
 
 export function selectControlledTerritories(territories, visibleRoutes, activities) {

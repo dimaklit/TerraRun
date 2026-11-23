@@ -29,6 +29,10 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .mode-switch { display: flex; gap: 4px; }
 .mode-switch button { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border: 0; border-radius: 4px; background: transparent; font-size: 11px; color: #77866e; }
 .mode-switch .mode-active { background: #e1eccf; color: #345633; font-weight: 800; }
+.type-switch button { padding: 10px 10px; }
+.dock-type-select { display: block; margin-bottom: 10px; }
+.dock-type-select span { display: block; margin-bottom: 4px; color: #98a68a; font-size: 8px; }
+.dock-type-select select { width: 100%; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; background: #f4f8ef; color: #547348; font-size: 11px; }
 .mode-count { display: grid; place-items: center; min-width: 18px; height: 18px; background: #f4f8ec; border-radius: 3px; font-size: 9px; }
 .runner-control { position: relative; }
 .runner-select { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: transparent; font-size: 11px; font-weight: 700; }
@@ -128,7 +132,7 @@ h1 { margin: 12px 0 0; font: 600 25px 'Space Grotesk', sans-serif; }
 .toast { position: absolute; z-index: 10; top: 90px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 30px); display: flex; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid #bfd2ac; background: #fbfdf9; border-radius: 5px; box-shadow: 0 5px 20px #263b2222; font-size: 11px; }.toast > svg { flex-shrink: 0; }.toast .icon-button { width: 25px; height: 25px; border: 0; }
 .reopen-panel { position: absolute; z-index: 3; left: 24px; top: 125px; display: flex; gap: 7px; align-items: center; border: 1px solid var(--line); border-radius: 4px; padding: 12px; background: #fbfdf9; font-size: 11px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-@media (max-width: 1000px) { .brand-tag { display: none; }.runner-name { display: none; }.side-panel { width: 300px; }.activity-strip { gap: 10px; }.strip-title { width: 110px; }.activity-item { padding: 7px 8px; } }
+@media (max-width: 1000px) { .brand-tag { display: none; }.runner-name { display: none; }.side-panel { width: 300px; }.activity-strip { gap: 10px; }.strip-title { width: 110px; }.activity-item { padding: 7px 8px; }.type-switch button { padding: 9px 7px; } }
 @media (max-width: 760px) {
   .app-shell { min-height: 640px; }.topbar { top: 10px; left: 12px; right: 12px; height: 56px; padding: 0 10px; gap: 8px; }.brand { gap: 4px; }.brand-name { font-size: 19px; }.brand-mark svg { width: 18px; }.mode-switch { gap: 2px; }.mode-switch button { gap: 4px; padding: 9px 7px; font-size: 10px; }.mode-switch svg { width: 12px; }.runner-avatar { width: 27px; height: 27px; font-size: 9px; }.runner-select > svg { display: none; }
   .district-label { top: 77px; left: 14px; font-size: 8px; }.map-tools { top: 102px; right: 12px; display: flex; gap: 6px; }.map-tools .icon-button { width: 34px; height: 34px; }.style-menu { right: 0; top: 42px; }

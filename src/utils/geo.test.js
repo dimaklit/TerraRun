@@ -45,3 +45,16 @@ test('parseRouteFile produces a short hashed activity key safe for btree indexes
   const [again] = await parseRouteFile(file);
   assert.equal(route.activityKey, again.activityKey);
 });
+
+test('activity type comes from the file when present, otherwise from the import selector', async () => {
+  const coordinates = [[34.81, 31.25], [34.82, 31.25]];
+  const ride = { name: 'ride.geojson', text: async () => JSON.stringify({ type: 'Feature', properties: { name: 'Ride', type: 'cycling' }, geometry: { type: 'LineString', coordinates } }) };
+  const [rideRoute] = await parseRouteFile(ride, 'hike');
+  assert.equal(rideRoute.activityType, 'bike');
+
+  const untyped = { name: 'walk.geojson', text: async () => JSON.stringify({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } }) };
+  const [walkRoute] = await parseRouteFile(untyped, 'hike');
+  assert.equal(walkRoute.activityType, 'hike');
+  const [defaultRoute] = await parseRouteFile(untyped);
+  assert.equal(defaultRoute.activityType, 'run');
+});

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { area, polygon } from '@turf/turf';
-import { applyTerritoryActivity, calculateTerritoryControl, getControlledAreaSqKm, selectControlledTerritories, selectRivalTerritories } from './territoryControl.js';
+import { applyTerritoryActivity, calculateTerritoryControl, calculateTerritoryControlByType, getControlledAreaSqKm, selectControlledTerritories, selectRivalTerritories } from './territoryControl.js';
 
 const rectangle = (west, south, east, north) => polygon([[[west,south],[east,south],[east,north],[west,north],[west,south]]]);
 const outer = rectangle(0, 0, 4, 4);
@@ -42,6 +42,35 @@ test('strength three requires three attacks to neutralize and a fourth to captur
 test('partial attack claims new land but only weakens the overlapping region', () => {
   const state = calculateTerritoryControl([activity('a','Mila',rectangle(0,0,2,2)),activity('b','Jonas',rectangle(1,0,3,2),1)]);
   assert.deepEqual(state.map((region) => region.properties.username).sort((first,second) => String(first).localeCompare(String(second))), ['Jonas','Mila',null]);
+});
+
+test('activity types are separate territory worlds that never contest each other', () => {
+  // Same square, two users, different sports: both keep full control in their world.
+  const worlds = calculateTerritoryControlByType([
+    { ...activity('a', 'Mila', outer, 0), activityType: 'run' },
+    { ...activity('b', 'Jonas', outer, 1), activityType: 'bike' },
+  ]);
+  assert.equal(worlds.length, 2);
+  assert.equal(worlds.find((region) => region.properties.activityType === 'run').properties.username, 'Mila');
+  assert.equal(worlds.find((region) => region.properties.activityType === 'bike').properties.username, 'Jonas');
+  assert.ok(worlds.every((region) => region.properties.strength === 1));
+
+  // Same sport: the later activity neutralizes the earlier owner as usual.
+  const contested = calculateTerritoryControlByType([
+    { ...activity('a', 'Mila', outer, 0), activityType: 'bike' },
+    { ...activity('b', 'Jonas', outer, 1), activityType: 'bike' },
+  ]);
+  assert.equal(contested.length, 1);
+  assert.equal(contested[0].properties.strength, 0);
+
+  // Legacy claims without a type fall into the default world.
+  const legacy = calculateTerritoryControlByType([
+    activity('a', 'Mila', outer, 0),
+    { ...activity('b', 'Jonas', outer, 1), activityType: 'run' },
+  ]);
+  assert.equal(legacy.length, 1);
+  assert.equal(legacy[0].properties.activityType, 'run');
+  assert.equal(legacy[0].properties.strength, 0);
 });
 
 test('activity history is chronological, duplicate imports and flagged runs add no strength', () => {

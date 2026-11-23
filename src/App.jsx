@@ -4,6 +4,7 @@ import rtlTextPluginUrl from '@mapbox/mapbox-gl-rtl-text/mapbox-gl-rtl-text.min.
 import {
   Activity,
   ArrowUpRight,
+  Bike,
   Building2,
   ChevronDown,
   Compass,
@@ -14,6 +15,7 @@ import {
   Layers3,
   LocateFixed,
   MapPinned,
+  Mountain,
   Plus,
   Route,
   ShieldAlert,
@@ -36,7 +38,8 @@ import {
   startGarminConnect,
 } from './utils/garmin.js';
 import { calculateRouteMetrics, calculateSharedAreaSqKm } from './utils/routeMetrics.js';
-import { calculateTerritoryControl, getControlledAreaSqKm, selectControlledTerritories, selectRivalTerritories } from './utils/territoryControl.js';
+import { calculateTerritoryControlByType, getControlledAreaSqKm, selectControlledTerritories, selectRivalTerritories } from './utils/territoryControl.js';
+import { ACTIVITY_TYPES, DEFAULT_ACTIVITY_TYPE, activityTypeLabel, speedLimitKmh } from './utils/activityTypes.js';
 import { loadRivalClaims, publishClaims } from './utils/sharedClaims.js';
 import { filterRoutes, getRouteColor, routePeriods } from './utils/routeFilters.js';
 
@@ -78,6 +81,7 @@ const mapStyles = [
 ];
 
 const emptyCollection = { type: 'FeatureCollection', features: [] };
+const typeIcons = { run: Footprints, hike: Mountain, bike: Bike };
 const claimCollection = (claims) => ({
   type: 'FeatureCollection',
   features: claims.filter((claim) => claim.polygon || claim.coordinates).map((claim) => ({
@@ -132,7 +136,7 @@ function RouteSelectionPanel({ runnerName, routesInPeriod, selectedRouteIds, per
         {routesInPeriod.map((route) => <label className="route-select-row" key={route.id}>
           <input type="checkbox" checked={selectedRouteIds.has(route.id)} onChange={() => onToggleRoute(route.id)} />
           <span className="route-select-swatch" style={{ backgroundColor: route.color }} />
-          <span className="route-select-copy"><strong>{route.name}</strong><small>{new Date(route.recordedAt).toLocaleDateString('en-US')}</small></span>
+          <span className="route-select-copy"><strong>{route.name}</strong><small>{new Date(route.recordedAt).toLocaleDateString('en-US')} · {activityTypeLabel(route.activityType)}</small></span>
           <span className="route-select-metrics"><strong>{route.distanceKm.toFixed(1)} km</strong><small>{route.areaSqKm > 0 ? `${route.areaSqKm.toFixed(3)} km²` : 'No claim'}</small></span>
         </label>)}
       </div>
@@ -157,6 +161,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     return Object.fromEntries([...new Set(demoClaims.map((claim) => claim.username))].map((username) => [username, new Set(routeIds)]));
   });
   const [routePeriod, setRoutePeriod] = useState('year');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [importType, setImportType] = useState(DEFAULT_ACTIVITY_TYPE);
   const [activeTab, setActiveTab] = useState('territory');
   const [notice, setNotice] = useState('');
   const [showBoard, setShowBoard] = useState(true);
@@ -199,6 +205,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         username: displayName,
         activityKey,
         recordedAt: Date.parse(recordedAt),
+        activityType: route.activityType ?? DEFAULT_ACTIVITY_TYPE,
       }));
       const claimsForUser = activities.flatMap(({ claim, route, activity_key: activityKey, recorded_at: recordedAt }) => claim ? [{
         ...claim,
@@ -206,6 +213,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         username: displayName,
         activityKey,
         recordedAt: Date.parse(recordedAt),
+        activityType: claim.activityType ?? route.activityType ?? DEFAULT_ACTIVITY_TYPE,
       }] : []);
       setRoutes(routesForUser);
       setClaims(claimsForUser);
@@ -267,8 +275,12 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     return () => { active = false; };
   }, [client, user, storageState, claims]);
 
-  const controlledTerritories = useMemo(() => calculateTerritoryControl([...claims, ...rivalClaims]), [claims, rivalClaims]);
-  const totalArea = useMemo(() => getControlledAreaSqKm(controlledTerritories, user ? user.email : undefined), [controlledTerritories, user]);
+  const controlledTerritories = useMemo(() => calculateTerritoryControlByType([...claims, ...rivalClaims], DEFAULT_ACTIVITY_TYPE), [claims, rivalClaims]);
+  // The activity-type filter narrows everything on the map: routes, own territories and rivals.
+  const typedTerritories = useMemo(() => typeFilter === 'all'
+    ? controlledTerritories
+    : controlledTerritories.filter((territory) => territory.properties.activityType === typeFilter), [controlledTerritories, typeFilter]);
+  const totalArea = useMemo(() => getControlledAreaSqKm(typedTerritories, user ? user.email : undefined), [typedTerritories, user]);
   const runnerName = user ? (user.name?.trim() || user.email) : currentRunner;
   const runnerKey = user?.id ?? currentRunner;
   const selectedRouteIds = routeSelections[runnerKey] ?? new Set(routes.map((route) => route.id));
@@ -276,10 +288,13 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     const selected = current[runnerKey] ?? new Set(routes.map((route) => route.id));
     return { ...current, [runnerKey]: update(selected) };
   });
-  const routesInPeriod = useMemo(() => filterRoutes(routes, new Set(routes.map((route) => route.id)), routePeriod), [routes, routePeriod]);
-  const visibleRoutes = useMemo(() => filterRoutes(routes, selectedRouteIds, routePeriod), [routes, selectedRouteIds, routePeriod]);
-  const visibleClaims = useMemo(() => selectControlledTerritories(controlledTerritories, visibleRoutes, claims), [controlledTerritories, visibleRoutes, claims]);
-  const rivalTerritories = useMemo(() => selectRivalTerritories(controlledTerritories), [controlledTerritories]);
+  const typedRoutes = useMemo(() => typeFilter === 'all'
+    ? routes
+    : routes.filter((route) => (route.activityType ?? DEFAULT_ACTIVITY_TYPE) === typeFilter), [routes, typeFilter]);
+  const routesInPeriod = useMemo(() => filterRoutes(typedRoutes, new Set(typedRoutes.map((route) => route.id)), routePeriod), [typedRoutes, routePeriod]);
+  const visibleRoutes = useMemo(() => filterRoutes(typedRoutes, selectedRouteIds, routePeriod), [typedRoutes, selectedRouteIds, routePeriod]);
+  const visibleClaims = useMemo(() => selectControlledTerritories(typedTerritories, visibleRoutes, claims), [typedTerritories, visibleRoutes, claims]);
+  const rivalTerritories = useMemo(() => selectRivalTerritories(typedTerritories), [typedTerritories]);
   const mapClaims = useMemo(() => [...visibleClaims, ...rivalTerritories], [visibleClaims, rivalTerritories]);
   const territoryTowers = useMemo(() => claimCollection(mapClaims), [mapClaims]);
   towersRef.current = territoryTowers;
@@ -288,12 +303,12 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   ), [claims, visibleRoutes]);
   claimsRef.current = mapClaims;
   visibleRoutesRef.current = visibleRoutes;
-  const ownedClaims = controlledTerritories.filter((territory) => territory.properties.username === runnerName);
-  const myArea = getControlledAreaSqKm(controlledTerritories, runnerName);
+  const ownedClaims = typedTerritories.filter((territory) => territory.properties.username === runnerName);
+  const myArea = getControlledAreaSqKm(typedTerritories, runnerName);
   const leaderboard = [...new Set(claims.map((claim) => claim.username))]
     .map((username) => ({
       username,
-      area: getControlledAreaSqKm(controlledTerritories, username),
+      area: getControlledAreaSqKm(typedTerritories, username),
       initials: username.split(' ').map((part) => part[0]).join(''),
     }))
     .sort((first, second) => second.area - first.area);
@@ -407,7 +422,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     try {
       const parsedFiles = await Promise.all(Array.from(files).map(async (file) => ({
         file,
-        routes: await parseRouteFile(file),
+        routes: await parseRouteFile(file, importType),
       })));
       const importedRoutes = [];
       const newClaims = [];
@@ -438,6 +453,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
             color,
             username: runnerName,
             activityKey,
+            activityType: parsed.activityType,
             distanceKm: parsed.routeDistanceKm,
             areaSqKm: parsed.areaSqKm,
             recordedAt: parsed.recordedAt ?? Date.now() + routeIndex,
@@ -456,6 +472,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
               name,
               username: runnerName,
               activityKey,
+              activityType: parsed.activityType,
               recordedAt: route.recordedAt,
               color,
               areaSqKm: parsed.areaSqKm,
@@ -537,6 +554,15 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
           <button className={activeTab === 'routes' ? 'mode-active' : ''} onClick={() => setActiveTab('routes')} role="tab" aria-selected={activeTab === 'routes'}>
             <Route size={15} /> Routes <span className="mode-count">{visibleRoutes.length}</span>
           </button>
+        </div>
+        <div className="mode-switch type-switch" role="tablist" aria-label="Activity type filter">
+          <button className={typeFilter === 'all' ? 'mode-active' : ''} title="All activity types" onClick={() => setTypeFilter('all')} role="tab" aria-selected={typeFilter === 'all'}>All</button>
+          {ACTIVITY_TYPES.map(({ id, label }) => {
+            const TypeIcon = typeIcons[id];
+            return <button key={id} className={typeFilter === id ? 'mode-active' : ''} title={`${label} only`} aria-label={`${label} only`} onClick={() => setTypeFilter(id)} role="tab" aria-selected={typeFilter === id}>
+              <TypeIcon size={15} />
+            </button>;
+          })}
         </div>
         <div className="runner-control">
           <button className="runner-select" title={user ? 'Account menu' : 'Switch runner'} aria-label={user ? 'Account menu' : 'Switch runner'} aria-expanded={showRunnerMenu} onClick={() => setShowRunnerMenu(!showRunnerMenu)}>
@@ -624,7 +650,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
           {mapClaims.length === 0 && <p className="route-empty-state">No captured territories in the selected routes.</p>}
           {mapClaims.map((claim) => <button className="territory-target" key={claim.id} onClick={() => inspectClaim(claim)}>
             <span className="territory-swatch" style={{ background: claim.color }}><Flag size={17} /></span>
-            <span><strong>{claim.name}</strong><small>{claim.username === runnerName ? 'Yours' : claim.username} · Strength {claim.strength} · {claim.areaSqKm.toFixed(3)} km²</small></span>
+            <span><strong>{claim.name}</strong><small>{claim.username === runnerName ? 'Yours' : claim.username} · {activityTypeLabel(claim.activityType)} · Strength {claim.strength} · {claim.areaSqKm.toFixed(3)} km²</small></span>
             <ArrowUpRight size={16} />
           </button>)}
         </div>
@@ -679,7 +705,13 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
       <aside className="route-dock">
         <div className="dock-topline"><span><Activity size={14} /> ACTIVITY IMPORT</span><span className="demo-tag">DEMO</span></div>
         <p>Claim your next sector.</p>
-        <div className="dock-meta"><span>GPX / GEOJSON</span><span>MAX 35 KM/H</span></div>
+        <label className="dock-type-select">
+          <span>ACTIVITY TYPE</span>
+          <select value={importType} onChange={(event) => setImportType(event.target.value)}>
+            {ACTIVITY_TYPES.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
+          </select>
+        </label>
+        <div className="dock-meta"><span>GPX / GEOJSON</span><span>MAX {speedLimitKmh(importType)} KM/H</span></div>
         <input ref={fileInput} className="visually-hidden" type="file" multiple disabled={storageState !== 'ready'} accept=".gpx,.json,.geojson,application/gpx+xml,application/geo+json,application/json" onChange={(event) => { handleFiles(event.target.files); event.target.value = ''; }} />
         <button className="upload-button" disabled={storageState !== 'ready'} onClick={() => fileInput.current?.click()}><Upload size={16} /> IMPORT ROUTE <Plus size={16} /></button>
       </aside>

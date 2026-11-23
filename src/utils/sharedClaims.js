@@ -15,6 +15,7 @@ export function rivalFromFeedRow(row) {
     recordedAt: Date.parse(row.recorded_at),
     polygon: row.claim.polygon,
     areaSqKm: row.claim.areaSqKm ?? 0,
+    activityType: row.claim.activityType ?? 'run',
   };
 }
 
@@ -27,15 +28,17 @@ export async function loadRivalClaims(client) {
   return (data ?? []).map(rivalFromFeedRow);
 }
 
-// Publishes only the claim polygon and area: no name, email or route details.
+// Publishes only the claim polygon, area and activity type: no name, email or route details.
 export async function publishClaims(client, claims) {
   const rows = claims.filter((claim) => claim.polygon).map((claim) => ({
     claim_key: claim.activityKey,
-    claim: { polygon: claim.polygon, areaSqKm: claim.areaSqKm },
+    claim: { polygon: claim.polygon, areaSqKm: claim.areaSqKm, activityType: claim.activityType ?? 'run' },
     recorded_at: new Date(claim.recordedAt).toISOString(),
   }));
   if (!rows.length) return;
-  const { error } = await client.from('shared_claims').insert(rows);
-  // 23505 = unique violation: the claim was already published earlier.
-  if (error && error.code !== '23505') throw error;
+  // One insert per row: a duplicate (23505) must not fail the batch of new claims,
+  // and the Data API rejects ON CONFLICT upserts under RLS.
+  const results = await Promise.all(rows.map((row) => client.from('shared_claims').insert(row)));
+  const failure = results.map((result) => result.error).find((error) => error && error.code !== '23505');
+  if (failure) throw failure;
 }

@@ -2,7 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { neon } from '@neondatabase/serverless';
 import FitParser from 'fit-file-parser';
 import { createPkcePair, openState, sealState } from './state.js';
-import { recordsToFeature } from './fit.js';
+import { recordsToFeature, sportToActivityType } from './fit.js';
 import { notifyNewUsers, sendDailyStats } from './admin.js';
 
 const GARMIN_AUTHORIZE_URL = 'https://connect.garmin.com/oauth2Confirm';
@@ -118,7 +118,8 @@ async function importActivityFile(env, sql, file) {
   const data = await new FitParser({ force: true }).parseAsync(await response.arrayBuffer());
   const startedAt = new Date((file.startTimeInSeconds ?? Date.now() / 1000) * 1000);
   const name = `Garmin ${startedAt.toISOString().slice(0, 16).replace('T', ' ')}`;
-  const geojson = recordsToFeature(data.records ?? [], name);
+  const activityType = sportToActivityType(data.sessions?.[0]?.sport ?? data.sports?.[0]?.sport);
+  const geojson = recordsToFeature(data.records ?? [], name, activityType);
   if (!geojson) return;
   const externalId = String(file.summaryId ?? file.activityId);
   await sql`

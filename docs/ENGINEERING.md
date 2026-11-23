@@ -20,7 +20,7 @@ TerraRun is a **territory-control game for runners**. The city is the board; you
 
 ### Design principles
 - **Privacy first.** Routes are private; only claim polygons are shared, with no identity attached.
-- **Honest effort.** Anti-cheat speed filter: sustained movement above 35 km/h (vehicles) claims nothing, while isolated GPS spikes are tolerated (median-of-3 smoothing + >10 s sustained rule).
+- **Honest effort.** Anti-cheat speed filter per activity type: sustained movement above the type's ceiling (run 35 km/h, hike 15 km/h, bike 65 km/h) claims nothing, while isolated GPS spikes are tolerated (median-of-3 smoothing + >10 s sustained rule).
 - **Partial combat.** Geometry is split precisely: only the overlapping fragment of a territory is contested; the rest is untouched.
 - **Zero cost, zero ads.** Free hosting/infrastructure tiers end-to-end.
 
@@ -132,9 +132,10 @@ RLS: select own; update own (`imported_at` column grant only).
 | `main.jsx` → `AuthGate.jsx` | session check, sign-in / sign-up (nickname, email, password) |
 | `App.jsx` | map, panels, import flow, state orchestration |
 | `utils/neon.js` | `createClient(VITE_NEON_DATABASE_URL)`; null → demo mode |
-| `utils/geo.js` | GPX/GeoJSON parsing → routes with coords, times, **sha256 activityKey** |
-| `utils/routeMetrics.js` | distance, closure detection (50 m tolerance), captured polygon (self-intersection → `polygonize`), **speed assessment** |
-| `utils/territoryControl.js` | strength combat engine (`applyTerritoryActivity`), visible/rival territory selection |
+| `utils/geo.js` | GPX/GeoJSON parsing → routes with coords, times, **sha256 activityKey**, activity-type detection |
+| `utils/routeMetrics.js` | distance, closure detection (50 m tolerance), captured polygon (self-intersection → `polygonize`), **per-type speed assessment** |
+| `utils/activityTypes.js` | activity types (run/hike/bike), provider sport-label normalization, per-type speed limits |
+| `utils/territoryControl.js` | strength combat engine (`applyTerritoryActivity`), per-type territory worlds, visible/rival territory selection |
 | `utils/sharedClaims.js` | publish own claims, load rivals, color/codename from `owner_token` |
 | `utils/activityStore.js` | load/save `private_activities` |
 | `utils/garmin.js` | worker API calls (JWT from `/auth/token`), pending-activity import |
@@ -143,8 +144,9 @@ RLS: select own; update own (`imported_at` column grant only).
 ### Import pipeline (both manual file and Garmin)
 ```
 File/GeoJSON → parseRouteFile → extractRouteGeometries (Multi/LineString + times)
+  → activity type: embedded label (Garmin FIT sport / GPX <type>) or the import selector (run/hike/bike)
   → calculateRouteMetrics:
-      speed profile → median-of-3 smoothing → flagged if >35 km/h sustained >10 s or >50 % of run
+      speed profile → median-of-3 smoothing → flagged if over the type limit (35/15/65 km/h) sustained >10 s or >50 % of run
       closure check (≤50 m start/finish) or self-intersection → captured polygon (Turf polygonize)
   → dedupe by activityKey → savePrivateActivities → publishClaims (anonymous)
   → state update → map fitBounds
@@ -152,7 +154,9 @@ File/GeoJSON → parseRouteFile → extractRouteGeometries (Multi/LineString + t
 
 ### Combat engine (`territoryControl.js`)
 Event-sourced: all claims (own + rival), sorted by `recorded_at`, are replayed through
-`applyTerritoryActivity`. Each step splits existing territories with Turf `intersect`/`difference`:
+`applyTerritoryActivity`. Each activity type (run / hike / bike) is a **separate territory world**
+— replayed independently, so a bike claim never contests run turf. Each step splits existing
+territories with Turf `intersect`/`difference`:
 - same owner on overlap → `strength + 1`
 - different owner → `strength − 1`; at 0 → neutral (`username: null`)
 - the non-overlapping remainder of the new claim becomes a new territory, strength 1
