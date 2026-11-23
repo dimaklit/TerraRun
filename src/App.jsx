@@ -181,6 +181,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const [showStyleMenu, setShowStyleMenu] = useState(false);
   const [showTowers, setShowTowers] = useState(true);
   const [showRivals, setShowRivals] = useState(true);
+  const [showImportDock, setShowImportDock] = useState(true);
   const claimsRef = useRef([]);
   const towersRef = useRef(emptyCollection);
   const nextRouteColor = useRef(demoRoutes.length);
@@ -710,8 +711,15 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         </div>
       </div>
 
-      <aside className="route-dock">
-        <div className="dock-topline"><span><Activity size={14} /> ACTIVITY IMPORT</span><span className="demo-tag">DEMO</span></div>
+      <input ref={fileInput} className="visually-hidden" type="file" multiple disabled={storageState !== 'ready'} accept=".gpx,.json,.geojson,application/gpx+xml,application/geo+json,application/json" onChange={(event) => { handleFiles(event.target.files); event.target.value = ''; }} />
+      {showImportDock ? <aside className="route-dock">
+        <div className="dock-topline">
+          <span><Activity size={14} /> ACTIVITY IMPORT</span>
+          <span className="dock-topline-actions">
+            <span className="demo-tag">DEMO</span>
+            <button className="icon-button dock-close" title="Hide activity import" aria-label="Hide activity import" onClick={() => setShowImportDock(false)}><X size={14} /></button>
+          </span>
+        </div>
         <p>Claim your next sector.</p>
         <label className="dock-type-select">
           <span>ACTIVITY TYPE</span>
@@ -720,9 +728,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
           </select>
         </label>
         <div className="dock-meta"><span>GPX / GEOJSON</span><span>MAX {speedLimitKmh(importType)} KM/H</span></div>
-        <input ref={fileInput} className="visually-hidden" type="file" multiple disabled={storageState !== 'ready'} accept=".gpx,.json,.geojson,application/gpx+xml,application/geo+json,application/json" onChange={(event) => { handleFiles(event.target.files); event.target.value = ''; }} />
         <button className="upload-button" disabled={storageState !== 'ready'} onClick={() => fileInput.current?.click()}><Upload size={16} /> IMPORT ROUTE <Plus size={16} /></button>
-      </aside>
+      </aside> : <button className="reopen-panel reopen-dock" onClick={() => setShowImportDock(true)}><Upload size={16} /> Activity import</button>}
 
       <section className="activity-strip" aria-label="Recent routes">
         <div className="strip-title"><span className="strip-marker"><Activity size={15} /></span><div><span className="eyebrow">SELECTED RUNS</span><strong>On the map</strong></div></div>
