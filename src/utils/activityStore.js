@@ -20,3 +20,12 @@ export async function savePrivateActivities(client, userId, routes, claims) {
   const { error } = await client.from('private_activities').insert(rows);
   if (error) throw error;
 }
+
+export async function saveClosedActivity(client, route, claim) {
+  const { error } = await client.rpc('close_activity_loop', {
+    activity_key_to_close: route.activityKey,
+    updated_route: route,
+    updated_claim: claim,
+  });
+  if (error) throw error;
+}

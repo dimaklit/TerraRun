@@ -104,6 +104,12 @@ h1 { margin: 12px 0 0; font: 600 25px 'Space Grotesk', sans-serif; }
 .route-select-copy strong { font-size: 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .route-select-copy small, .route-select-metrics small { color: #91a080; font-size: 8px; }
 .route-select-metrics { text-align: right; white-space: nowrap; }.route-select-metrics strong { font-size: 9px; }
+.route-closing-distance { grid-column: 1 / -1; color: #647968; font-size: 12px; }
+.route-select-row { grid-template-columns: 16px 5px minmax(0, 1fr); }
+.route-focus { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; min-height: 44px; }
+.route-loop-action { grid-column: 3 / -1; font-size: 12px; color: var(--accent); }
+.route-loop-action .text-button { min-height: 44px; font-size: 12px; }
+.route-loop-action button:disabled { opacity: .6; cursor: wait; }
 .route-empty-state { font-size: 10px; color: #819175; line-height: 1.6; padding: 10px; }
 .district-label { position: absolute; z-index: 1; top: 98px; left: 26px; display: flex; align-items: center; gap: 8px; color: #6a7c59; font-size: 9px; font-weight: 800; }
 .district-label > span:not(.status-indicator) { color: #adb99d; }

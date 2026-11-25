@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { area, polygon } from '@turf/turf';
-import { buildTerritoryTowers, calculateRouteMetrics, calculateSharedAreaSqKm } from './routeMetrics.js';
+import { buildTerritoryTowers, calculateRouteMetrics, calculateSharedAreaSqKm, closeRouteLoop } from './routeMetrics.js';
 
 test('overlapping towers have additive heights and non-overlapping geometry', () => {
   const first = rectangle(0, 0, 2, 1);
@@ -100,6 +100,30 @@ test('closes a route whose finish is within the 50 meter tolerance', () => {
 
   assert.equal(metrics.isClosed, true);
   assert.ok(metrics.areaSqKm > 0);
+});
+
+test('manual closure captures an open route beyond 50 m without changing its GPS points or distance', () => {
+  const coordinates = [[0, 0], [0.001, 0], [0.001, 0.001]];
+  const metrics = calculateRouteMetrics(coordinates);
+  const original = { id: 'route', activityKey: 'key', recordedAt: 123, coordinates, distanceKm: metrics.routeDistanceKm };
+  const closed = closeRouteLoop(original);
+  assert.ok(metrics.closingDistanceM > 50);
+  assert.equal(metrics.polygon, null);
+  assert.equal(closed.route.closedByUser, true);
+  assert.equal(original.closedByUser, undefined);
+  assert.deepEqual(closed.route.coordinates, coordinates);
+  assert.equal(closed.route.distanceKm, metrics.routeDistanceKm);
+  assert.ok(closed.route.areaSqKm > 0);
+  assert.equal(closed.claim.activityKey, 'key');
+  assert.equal(closed.claim.recordedAt, 123);
+  assert.deepEqual(closed.claim.polygon.geometry.coordinates[0].at(-1), coordinates[0]);
+});
+
+test('manual closure rejects speed-flagged and zero-area routes', () => {
+  const coordinates = [[0, 0], [0.001, 0], [0.001, 0.001]];
+  assert.throws(() => closeRouteLoop({ coordinates, flagged: true }), /Speed-flagged/);
+  assert.throws(() => closeRouteLoop({ coordinates, times: [0, 1000, 2000] }), /Speed-flagged/);
+  assert.throws(() => closeRouteLoop({ coordinates: [[0, 0], [0.001, 0]] }), /does not enclose/);
 });
 
 test('withholds area for a sustained speed-flagged route', () => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadPrivateActivities, savePrivateActivities } from './activityStore.js';
+import { loadPrivateActivities, saveClosedActivity, savePrivateActivities } from './activityStore.js';
 
 test('loading private activities filters by the authenticated user and time-orders results', async () => {
   const calls = [];
@@ -39,4 +39,17 @@ test('database errors are propagated to the caller', async () => {
   const failure = new Error('Data API unavailable');
   const client = { from() { return { insert() { return Promise.resolve({ error: failure }); } }; } };
   await assert.rejects(savePrivateActivities(client, 'user-123', [{ id: 'route-1', activityKey: 'key', recordedAt: Date.now() }], []), failure);
+});
+
+test('manual closure saves route and claim together and surfaces database failures', async () => {
+  const route = { activityKey: 'existing', closedByUser: true };
+  const claim = { routeId: 'route', areaSqKm: 0.1 };
+  const calls = [];
+  const client = { rpc: async (...args) => { calls.push(args); return { error: null }; } };
+  await saveClosedActivity(client, route, claim);
+  assert.deepEqual(calls, [['close_activity_loop', {
+    activity_key_to_close: 'existing', updated_route: route, updated_claim: claim,
+  }]]);
+  const failure = new Error('Permission denied');
+  await assert.rejects(saveClosedActivity({ rpc: async () => ({ error: failure }) }, route, claim), failure);
 });

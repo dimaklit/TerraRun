@@ -147,11 +147,11 @@ function getCapturedGeometry(route, isClosed) {
   };
 }
 
-export function calculateRouteMetrics(coordinates, times = [], activityType = DEFAULT_ACTIVITY_TYPE) {
+export function calculateRouteMetrics(coordinates, times = [], activityType = DEFAULT_ACTIVITY_TYPE, { closeLoop = false } = {}) {
   const first = coordinates[0];
   const last = coordinates[coordinates.length - 1];
   const closingDistanceKm = distance(first, last);
-  const isClosed = closingDistanceKm <= 0.05;
+  const isClosed = closeLoop || closingDistanceKm <= 0.05;
   // Each activity type has its own anti-cheat speed ceiling.
   const { maxSpeedKmh, flagged } = assessSpeed(coordinates, times, speedLimitKmh(activityType));
   const capturedGeometry = flagged
@@ -167,5 +167,26 @@ export function calculateRouteMetrics(coordinates, times = [], activityType = DE
     flagged,
     maxSpeedKmh,
     activityType,
+  };
+}
+
+export function closeRouteLoop(route) {
+  const metrics = calculateRouteMetrics(route.coordinates, route.times ?? [], route.activityType, { closeLoop: true });
+  if (route.flagged || metrics.flagged) throw new Error('Speed-flagged routes cannot capture territory.');
+  if (!metrics.polygon) throw new Error('Closing this route does not enclose an area.');
+  return {
+    route: { ...route, closedByUser: true, areaSqKm: metrics.areaSqKm },
+    claim: {
+      id: route.id,
+      routeId: route.id,
+      name: route.name,
+      username: route.username,
+      activityKey: route.activityKey,
+      activityType: route.activityType ?? DEFAULT_ACTIVITY_TYPE,
+      recordedAt: route.recordedAt,
+      color: route.color,
+      polygon: metrics.polygon,
+      areaSqKm: metrics.areaSqKm,
+    },
   };
 }

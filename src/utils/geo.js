@@ -67,6 +67,7 @@ export function parseRouteFile(file, defaultActivityType = DEFAULT_ACTIVITY_TYPE
     return Promise.all(routes.map(async ({ name, activityType, coordinates, times }) => ({
       name,
       coordinates,
+      times,
       // Hashed so it stays small enough for the unique btree indexes.
       activityKey: await hashActivityKey(JSON.stringify({ coordinates, times, name: name ?? file.name })),
       recordedAt: times.find((time) => Number.isFinite(time)),

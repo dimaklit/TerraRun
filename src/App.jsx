@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
+import { distance } from '@turf/turf';
 import rtlTextPluginUrl from '@mapbox/mapbox-gl-rtl-text/mapbox-gl-rtl-text.min.js?url';
 import {
   Activity,
@@ -28,7 +29,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { parseRouteFile } from './utils/geo.js';
-import { loadPrivateActivities, savePrivateActivities } from './utils/activityStore.js';
+import { loadPrivateActivities, saveClosedActivity, savePrivateActivities } from './utils/activityStore.js';
 import {
   activityToFile,
   disconnectGarmin,
@@ -38,7 +39,7 @@ import {
   markExternalActivitiesImported,
   startGarminConnect,
 } from './utils/garmin.js';
-import { calculateRouteMetrics, calculateSharedAreaSqKm } from './utils/routeMetrics.js';
+import { calculateRouteMetrics, calculateSharedAreaSqKm, closeRouteLoop } from './utils/routeMetrics.js';
 import { calculateTerritoryControlByType, getControlledAreaSqKm, selectControlledTerritories, selectRivalTerritories } from './utils/territoryControl.js';
 import { ACTIVITY_TYPES, DEFAULT_ACTIVITY_TYPE, activityTypeLabel, speedLimitKmh } from './utils/activityTypes.js';
 import { loadRivalClaims, publishClaims } from './utils/sharedClaims.js';
@@ -105,11 +106,11 @@ const routeCollection = (routes) => ({
     type: 'Feature',
     id: route.id,
     properties: { id: route.id, color: route.color },
-    geometry: { type: 'LineString', coordinates: route.coordinates },
+    geometry: { type: 'LineString', coordinates: route.closedByUser ? [...route.coordinates, route.coordinates[0]] : route.coordinates },
   })),
 });
 
-function RouteSelectionPanel({ runnerName, routesInPeriod, selectedRouteIds, period, onPeriodChange, onToggleRoute, onSelectAll, onClear, onClose, floatStyle, handleProps }) {
+function RouteSelectionPanel({ runnerName, routesInPeriod, selectedRouteIds, period, onPeriodChange, onToggleRoute, onFocusRoute, onCloseLoop, closingRouteId, onSelectAll, onClear, onClose, floatStyle, handleProps }) {
   const selectedInPeriod = routesInPeriod.filter((route) => selectedRouteIds.has(route.id)).length;
 
   return (
@@ -134,12 +135,18 @@ function RouteSelectionPanel({ runnerName, routesInPeriod, selectedRouteIds, per
       </div>
       <div className="route-select-list">
         {routesInPeriod.length === 0 && <p className="route-empty-state">No routes in this period.</p>}
-        {routesInPeriod.map((route) => <label className="route-select-row" key={route.id}>
-          <input type="checkbox" checked={selectedRouteIds.has(route.id)} onChange={() => onToggleRoute(route.id)} />
+        {routesInPeriod.map((route) => <div className="route-select-row" key={route.id}>
+          <input aria-label={`Show ${route.name} on map`} type="checkbox" checked={selectedRouteIds.has(route.id)} onChange={() => onToggleRoute(route)} />
           <span className="route-select-swatch" style={{ backgroundColor: route.color }} />
-          <span className="route-select-copy"><strong>{route.name}</strong><small>{new Date(route.recordedAt).toLocaleDateString('en-US')} · {activityTypeLabel(route.activityType)}</small></span>
-          <span className="route-select-metrics"><strong>{route.distanceKm.toFixed(1)} km</strong><small>{route.areaSqKm > 0 ? `${route.areaSqKm.toFixed(3)} km²` : 'No claim'}</small></span>
-        </label>)}
+          <button className="route-focus" aria-label={`Show route area: ${route.name}`} onClick={() => onFocusRoute(route)}>
+            <span className="route-select-copy"><strong>{route.name}</strong><small>{new Date(route.recordedAt).toLocaleDateString('en-US')} · {activityTypeLabel(route.activityType)}</small></span>
+            <span className="route-select-metrics"><strong>{route.distanceKm.toFixed(1)} km</strong><small>{route.areaSqKm > 0 ? `${route.areaSqKm.toFixed(3)} km²` : 'No claim'}</small></span>
+            <span className="route-closing-distance">Start–finish distance: {distance(route.coordinates[0], route.coordinates[route.coordinates.length - 1], { units: 'meters' }).toFixed(1)} m</span>
+          </button>
+          <span className="route-loop-action">{route.closedByUser
+            ? <span>Closed by user</span>
+            : <button className="text-button" disabled={closingRouteId !== null} onClick={() => onCloseLoop(route)}>{closingRouteId === route.id ? 'Closing…' : 'Close the loop'}</button>}</span>
+        </div>)}
       </div>
     </section>
   );
@@ -230,6 +237,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const activeTabRef = useRef(activeTab);
   const showTowersRef = useRef(showTowers);
   const importing = useRef(false);
+  const closingRoute = useRef(false);
+  const [closingRouteId, setClosingRouteId] = useState(null);
   const fittedToOwnRoutes = useRef(false);
   const geolocateRef = useRef(null);
   activeTabRef.current = activeTab;
@@ -493,6 +502,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
             id,
             name,
             coordinates: parsed.coordinates,
+            times: parsed.times,
+            flagged: parsed.flagged,
             color,
             username: runnerName,
             activityKey,
@@ -559,6 +570,38 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     if (coordinates.length) {
       const bounds = coordinates.reduce((result, point) => result.extend(point), new maplibregl.LngLatBounds(coordinates[0], coordinates[0]));
       mapRef.current?.fitBounds(bounds, { padding: window.innerWidth <= 760 ? 50 : 100, maxZoom: 15, duration: 700 });
+    }
+  }
+
+  function focusRoute(route) {
+    updateRouteSelection((current) => new Set([...current, route.id]));
+    const bounds = route.coordinates.reduce((result, point) => result.extend(point), new maplibregl.LngLatBounds(route.coordinates[0], route.coordinates[0]));
+    const mobile = window.innerWidth <= 760;
+    if (mobile) setShowPanel(false);
+    const panel = document.querySelector('.side-panel')?.getBoundingClientRect();
+    const padding = mobile
+      ? { top: window.innerHeight <= 500 && window.innerWidth >= 500 ? 80 : 180, bottom: 70, left: 30, right: 30 }
+      : { top: 100, bottom: 140, left: panel ? Math.min(panel.right + 20, window.innerWidth * 0.4) : 50, right: 60 };
+    mapRef.current?.stop();
+    mapRef.current?.fitBounds(bounds, { padding, maxZoom: 16, duration: 0 });
+  }
+
+  async function closeLoop(route) {
+    if (closingRoute.current || route.closedByUser) return;
+    closingRoute.current = true;
+    setClosingRouteId(route.id);
+    try {
+      const closed = closeRouteLoop(route);
+      if (user && client) await saveClosedActivity(client, closed.route, closed.claim);
+      setRoutes((current) => current.map((item) => item.id === route.id ? closed.route : item));
+      setClaims((current) => [...current.filter((claim) => claim.routeId !== route.id), closed.claim]);
+      focusRoute(closed.route);
+      setNotice('Loop closed. Territory recalculated. Closed by user.');
+    } catch (error) {
+      setNotice(error?.message ?? 'Unable to close this route.');
+    } finally {
+      closingRoute.current = false;
+      setClosingRouteId(null);
     }
   }
 
@@ -658,12 +701,20 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
           period={routePeriod}
           onPeriodChange={setRoutePeriod}
           runnerName={runnerName}
-          onToggleRoute={(routeId) => updateRouteSelection((current) => {
+          onToggleRoute={(route) => {
+            if (!selectedRouteIds.has(route.id)) {
+              focusRoute(route);
+              return;
+            }
+            updateRouteSelection((current) => {
             const next = new Set(current);
-            if (next.has(routeId)) next.delete(routeId);
-            else next.add(routeId);
+            next.delete(route.id);
             return next;
-          })}
+            });
+          }}
+          onFocusRoute={focusRoute}
+          onCloseLoop={closeLoop}
+          closingRouteId={closingRouteId}
           onSelectAll={() => updateRouteSelection((current) => new Set([...current, ...routesInPeriod.map((route) => route.id)]))}
           onClear={() => updateRouteSelection((current) => {
             const next = new Set(current);
