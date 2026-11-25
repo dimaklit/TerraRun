@@ -153,6 +153,7 @@ function useFloating({ freezeSize = false } = {}) {
 
   const handleProps = {
     onPointerDown(event) {
+      if (window.matchMedia('(max-width: 760px)').matches) return;
       if (event.target.closest('button, select, input, a')) return;
       const rect = event.currentTarget.parentElement.getBoundingClientRect();
       drag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, width: rect.width, height: rect.height };
@@ -200,7 +201,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const [activeTab, setActiveTab] = useState('territory');
   const [notice, setNotice] = useState('');
   const [showBoard, setShowBoard] = useState(true);
-  const [showPanel, setShowPanel] = useState(true);
+  const [showPanel, setShowPanel] = useState(() => !window.matchMedia('(max-width: 760px)').matches);
   const [showRunnerMenu, setShowRunnerMenu] = useState(false);
   const [currentRunner, setCurrentRunner] = useState(() => user?.email ?? 'Mila Chen');
   const [storageState, setStorageState] = useState(() => user ? 'loading' : 'ready');
@@ -214,7 +215,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const [showStyleMenu, setShowStyleMenu] = useState(false);
   const [showTowers, setShowTowers] = useState(true);
   const [showRivals, setShowRivals] = useState(true);
-  const [showImportDock, setShowImportDock] = useState(true);
+  const [showImportDock, setShowImportDock] = useState(() => !window.matchMedia('(max-width: 760px)').matches);
+  const [showRecentRoutes, setShowRecentRoutes] = useState(false);
   // Every panel is a floating window, draggable by its header.
   const dockFloat = useFloating();
   const panelFloat = useFloating({ freezeSize: true });
@@ -584,8 +586,16 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const inspectedClaim = mapClaims.find((claim) => claim.id === selectedClaim);
   const inspectedRoute = inspectedClaim && routes.find((route) => route.id === inspectedClaim.routeId);
 
+  function selectTab(tab) {
+    setActiveTab(tab);
+    if (window.matchMedia('(max-width: 760px)').matches) {
+      setShowRecentRoutes(false);
+      setShowPanel(true);
+    }
+  }
+
   return (
-    <main className="app-shell">
+    <main className={`app-shell${showPanel ? ' panel-open' : ''}${showRecentRoutes ? ' show-recent-routes' : ''}`}>
       <div className="map-canvas" ref={mapContainer} aria-label="Captured territory map" />
 
       <header className="topbar">
@@ -595,10 +605,10 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
           <span className="brand-tag">v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}</span>
         </a>
         <div className="mode-switch" role="tablist" aria-label="Map mode">
-          <button className={activeTab === 'territory' ? 'mode-active' : ''} onClick={() => setActiveTab('territory')} role="tab" aria-selected={activeTab === 'territory'}>
+          <button className={activeTab === 'territory' ? 'mode-active' : ''} onClick={() => selectTab('territory')} role="tab" aria-selected={activeTab === 'territory'}>
             <Layers3 size={15} /> Territory
           </button>
-          <button className={activeTab === 'routes' ? 'mode-active' : ''} onClick={() => setActiveTab('routes')} role="tab" aria-selected={activeTab === 'routes'}>
+          <button className={activeTab === 'routes' ? 'mode-active' : ''} onClick={() => selectTab('routes')} role="tab" aria-selected={activeTab === 'routes'}>
             <Route size={15} /> Routes <span className="mode-count">{visibleRoutes.length}</span>
           </button>
         </div>
@@ -771,7 +781,13 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         <button className="upload-button" disabled={storageState !== 'ready'} onClick={() => fileInput.current?.click()}><Upload size={16} /> IMPORT ROUTE <Plus size={16} /></button>
       </aside> : <button className="reopen-panel reopen-dock" onClick={() => setShowImportDock(true)}><Upload size={16} /> Activity import</button>}
 
-      <section className="activity-strip" aria-label="Recent routes" style={stripFloat.style}>
+      <button className="recent-toggle" aria-expanded={showRecentRoutes} aria-controls="recent-routes" onClick={() => {
+        if (!showRecentRoutes) setShowPanel(false);
+        setShowRecentRoutes((visible) => !visible);
+      }}>
+        <Activity size={16} /> {showRecentRoutes ? 'Hide recent routes' : 'Recent routes'}
+      </button>
+      <section id="recent-routes" className="activity-strip" aria-label="Recent routes" style={stripFloat.style}>
         <div className="strip-title drag-handle" {...stripFloat.handleProps}><span className="strip-marker"><Activity size={15} /></span><div><span className="eyebrow">SELECTED RUNS</span><strong>On the map</strong></div></div>
         <div className="activity-items">
           {visibleRoutes.slice(0, 3).map((route) => <button className="activity-item" key={route.id} onClick={() => {
@@ -785,12 +801,12 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
             </span>
           </button>)}
         </div>
-        <button className="strip-more" title="View route list" onClick={() => setActiveTab('routes')}><ArrowUpRight size={17} /></button>
+        <button className="strip-more" title="View route list" aria-label="View route list" onClick={() => selectTab('routes')}><ArrowUpRight size={17} /></button>
       </section>
 
       <div className="map-status"><span className="status-indicator" /> {mapReady ? 'MAP READY' : 'LOADING MAP'} <span className="status-divider">/</span> OPENFREEMAP</div>
       {notice && <div className="toast" role="status"><ShieldAlert size={17} /><span>{notice}</span><button className="icon-button" title="Dismiss" onClick={() => setNotice('')}><X size={15} /></button></div>}
-      {!showPanel && <button className="reopen-panel" onClick={() => setShowPanel(true)}><Crown size={16} /> {activeTab === 'routes' ? 'Route selection' : 'Territory stats'}</button>}
+      {!showPanel && <button className="reopen-panel" onClick={() => { setShowRecentRoutes(false); setShowPanel(true); }}><Crown size={16} /> {activeTab === 'routes' ? 'Route selection' : 'Territory stats'}</button>}
     </main>
   );
 }

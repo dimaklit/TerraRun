@@ -13,6 +13,9 @@ npm run dev
 
 On Windows PowerShell, use `npm.cmd` if execution policy blocks `npm`.
 
+On small screens, use the map tabs or **Territory stats**, **Activity import**,
+and **Recent routes** to open the corresponding panels.
+
 ## Neon local setup
 
 The app falls back to demo mode when Neon is not configured. To use the Neon
