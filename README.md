@@ -27,6 +27,14 @@ are preserved. Speed-flagged routes and routes enclosing no area cannot be close
 New imports retain speed-check metadata; older saved routes may not contain it.
 Manual closure in demo mode lasts only for the current page session.
 
+Territory mode displays owner-colored flags with control-strength badges.
+Nearby flags group into a count badge; click to zoom in, or click a single flag
+to inspect its territory and highlight the boundary. Flags follow the route,
+activity-type and rival filters. A short celebration after a successful import
+or manual closure shows only the net increase in your controlled area, not the
+entire enclosed route area. Mobile flag motion is brief; reduced-motion settings
+disable the flag and capture animations.
+
 ## Neon local setup
 
 The app falls back to demo mode when Neon is not configured. To use the Neon

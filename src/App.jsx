@@ -44,6 +44,7 @@ import { calculateTerritoryControlByType, getControlledAreaSqKm, selectControlle
 import { ACTIVITY_TYPES, DEFAULT_ACTIVITY_TYPE, activityTypeLabel, speedLimitKmh } from './utils/activityTypes.js';
 import { loadRivalClaims, publishClaims } from './utils/sharedClaims.js';
 import { filterRoutes, getRouteColor, routePeriods } from './utils/routeFilters.js';
+import TerritoryFlags from './components/TerritoryFlags.jsx';
 
 const dayMs = 24 * 60 * 60 * 1000;
 const demoRecordedAt = Date.now();
@@ -217,6 +218,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const [storageError, setStorageError] = useState('');
   const [storageAttempt, setStorageAttempt] = useState(0);
   const [selectedClaim, setSelectedClaim] = useState(null);
+  const [capture, setCapture] = useState(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapStyle, setMapStyle] = useState('positron');
   const [showStyleMenu, setShowStyleMenu] = useState(false);
@@ -230,6 +232,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const detailFloat = useFloating();
   const stripFloat = useFloating({ freezeSize: true });
   const claimsRef = useRef([]);
+  const selectedClaimRef = useRef(null);
   const towersRef = useRef(emptyCollection);
   const nextRouteColor = useRef(demoRoutes.length);
   const importedActivityKeys = useRef(new Set());
@@ -243,6 +246,7 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   const geolocateRef = useRef(null);
   activeTabRef.current = activeTab;
   showTowersRef.current = showTowers;
+  selectedClaimRef.current = selectedClaim;
 
   useEffect(() => {
     if (!user || !client) return undefined;
@@ -417,6 +421,17 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
         paint: { 'line-color': ['get', 'color'], 'line-width': 2.2, 'line-opacity': 0.95 },
         layout: { visibility: activeTabRef.current === 'territory' ? 'visible' : 'none' },
       });
+      map.addSource('selected-claim', { type: 'geojson', data: claimCollection(claimsRef.current.filter((claim) => claim.id === selectedClaimRef.current)) });
+      map.addLayer({
+        id: 'claim-selection-halo', type: 'line', source: 'selected-claim',
+        paint: { 'line-color': '#ffffff', 'line-width': 12, 'line-opacity': 0.75, 'line-blur': 4 },
+        layout: { visibility: activeTabRef.current === 'territory' ? 'visible' : 'none' },
+      });
+      map.addLayer({
+        id: 'claim-selection-line', type: 'line', source: 'selected-claim',
+        paint: { 'line-color': '#224b36', 'line-width': 4, 'line-opacity': 1 },
+        layout: { visibility: activeTabRef.current === 'territory' ? 'visible' : 'none' },
+      });
       map.addSource('routes', { type: 'geojson', data: routeCollection(visibleRoutesRef.current) });
       map.addLayer({
         id: 'route-lines', type: 'line', source: 'routes',
@@ -449,8 +464,13 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     mapRef.current.getSource('claims')?.setData(claimCollection(mapClaims));
     mapRef.current.getSource('claim-towers')?.setData(territoryTowers);
     mapRef.current.getSource('routes')?.setData(routeCollection(visibleRoutes));
-    setSelectedClaim(null);
+    setSelectedClaim((current) => mapClaims.some((claim) => claim.id === current) ? current : null);
   }, [mapClaims, visibleRoutes, territoryTowers, mapReady]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    mapRef.current?.getSource('selected-claim')?.setData(claimCollection(mapClaims.filter((claim) => claim.id === selectedClaim)));
+  }, [selectedClaim, mapClaims, mapReady, mapStyle]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -459,6 +479,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     map.setLayoutProperty('claim-fill', 'visibility', visibility);
     map.setLayoutProperty('claim-extrusions', 'visibility', activeTab === 'territory' && showTowers ? 'visible' : 'none');
     map.setLayoutProperty('claim-outline', 'visibility', visibility);
+    map.setLayoutProperty('claim-selection-halo', 'visibility', visibility);
+    map.setLayoutProperty('claim-selection-line', 'visibility', visibility);
     map.setLayoutProperty('route-lines', 'visibility', 'visible');
   }, [activeTab, mapReady, showTowers]);
 
@@ -467,6 +489,18 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
     const timeout = window.setTimeout(() => setNotice(''), 4800);
     return () => window.clearTimeout(timeout);
   }, [notice]);
+
+  useEffect(() => {
+    if (!capture) return undefined;
+    const timeout = window.setTimeout(() => setCapture(null), 4200);
+    return () => window.clearTimeout(timeout);
+  }, [capture]);
+
+  function celebrateCapture(nextClaims, routeIds) {
+    const before = getControlledAreaSqKm(controlledTerritories, runnerName);
+    const after = getControlledAreaSqKm(calculateTerritoryControlByType([...nextClaims, ...rivalClaims], DEFAULT_ACTIVITY_TYPE), runnerName);
+    if (after - before > 0.0000001) setCapture({ areaSqKm: after - before, routeIds });
+  }
 
   async function handleFiles(files) {
     if (!files?.length || importing.current || storageState !== 'ready') return;
@@ -543,7 +577,10 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
       setRoutes((current) => [...importedRoutes, ...current]);
       batchKeys.forEach((key) => importedActivityKeys.current.add(key));
       updateRouteSelection((current) => new Set([...current, ...importedRoutes.map((route) => route.id)]));
-      if (newClaims.length) setClaims((current) => [...newClaims, ...current]);
+      if (newClaims.length) {
+        celebrateCapture([...newClaims, ...claims], newClaims.map((claim) => claim.routeId));
+        setClaims((current) => [...newClaims, ...current]);
+      }
       const coordinates = importedRoutes.flatMap((route) => route.coordinates);
       if (coordinates.length) {
         const bounds = coordinates.reduce((result, point) => result.extend(point), new maplibregl.LngLatBounds(coordinates[0], coordinates[0]));
@@ -594,6 +631,8 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
       const closed = closeRouteLoop(route);
       if (user && client) await saveClosedActivity(client, closed.route, closed.claim);
       setRoutes((current) => current.map((item) => item.id === route.id ? closed.route : item));
+      const nextClaims = [...claims.filter((claim) => claim.routeId !== route.id), closed.claim];
+      celebrateCapture(nextClaims, [route.id]);
       setClaims((current) => [...current.filter((claim) => claim.routeId !== route.id), closed.claim]);
       focusRoute(closed.route);
       setNotice('Loop closed. Territory recalculated. Closed by user.');
@@ -640,6 +679,17 @@ function App({ user = null, client = null, onSignOut, authMessage }) {
   return (
     <main className={`app-shell${showPanel ? ' panel-open' : ''}${showRecentRoutes ? ' show-recent-routes' : ''}`}>
       <div className="map-canvas" ref={mapContainer} aria-label="Captured territory map" />
+      {mapReady && activeTab === 'territory' && <TerritoryFlags
+        map={mapRef.current} claims={mapClaims} selectedId={selectedClaim}
+        recentRouteIds={capture?.routeIds ?? []} onSelect={setSelectedClaim}
+      />}
+      {capture && <div className="capture-banner" role="status">
+        <span className="capture-medal"><Flag size={25} aria-hidden="true" /></span>
+        <div><span className="capture-kicker">DISTRICT CONTROL EXPANDED</span><strong>Territory secured</strong>
+          <span className="capture-gain">+{capture.areaSqKm < 0.001 ? `${(capture.areaSqKm * 1_000_000).toFixed(1)} m²` : `${capture.areaSqKm.toFixed(3)} km²`} controlled</span>
+        </div>
+        <button className="icon-button" aria-label="Dismiss capture celebration" onClick={() => setCapture(null)}><X size={16} /></button>
+      </div>}
 
       <header className="topbar">
         <a className="brand" href="#home" aria-label="TerraRun home">
